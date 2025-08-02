@@ -4,6 +4,8 @@
 
 Welcome to the Voice Agents Project! This is Day 1 of the 30 Days of Voice Agents challenge.
 
+**🔗 GitHub Repository**: https://github.com/Keerthi2311/voice-agents-project
+
 ### 🚀 Project Overview
 
 This project demonstrates a complete full-stack setup with:
@@ -26,12 +28,18 @@ voice-agents-project/
 
 ### 🛠️ Setup Instructions
 
-1. **Install Dependencies**:
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/Keerthi2311/voice-agents-project.git
+   cd voice-agents-project
+   ```
+
+2. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Run the Server**:
+3. **Run the Server**:
    ```bash
    python main.py
    ```
@@ -40,7 +48,7 @@ voice-agents-project/
    uvicorn main:app --reload --host 0.0.0.0 --port 8001
    ```
 
-3. **Access the Application**:
+4. **Access the Application**:
    Open your browser and navigate to: `http://localhost:8001`
 
 ### 🔗 API Endpoints
