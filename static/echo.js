@@ -25,13 +25,42 @@ function initializeEchoBot() {
         
         // Check for browser support
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            statusDiv.textContent = '❌ Your browser does not support audio recording.';
+            statusDiv.textContent = '❌ Your browser does not support audio recording. Please use Chrome, Firefox, or Edge.';
             statusDiv.className = 'recording-status error';
             startBtn.disabled = true;
+            return;
+        }
+        
+        // Check MediaRecorder support
+        if (!window.MediaRecorder) {
+            statusDiv.textContent = '❌ MediaRecorder not supported. Please update your browser.';
+            statusDiv.className = 'recording-status error';
+            startBtn.disabled = true;
+            return;
+        }
+        
+        // Check for HTTPS (required for getUserMedia in most browsers)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            statusDiv.textContent = '⚠️ HTTPS required for microphone access. Use localhost for testing.';
+            statusDiv.className = 'recording-status error';
         } else {
             statusDiv.textContent = '🎤 Ready to record! Click "Start Recording" to begin.';
             statusDiv.className = 'recording-status ready';
         }
+        
+        // Log supported MIME types for debugging
+        const supportedTypes = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/wav',
+            'audio/ogg'
+        ];
+        
+        console.log('📋 Supported audio formats:');
+        supportedTypes.forEach(type => {
+            console.log(`${type}: ${MediaRecorder.isTypeSupported(type)}`);
+        });
     }
 }
 
@@ -44,7 +73,9 @@ async function startRecording() {
     const playbackSection = document.getElementById('playbackSection');
     
     try {
-        // Request microphone access
+        // Request microphone access with detailed error handling
+        console.log('🎤 Requesting microphone access...');
+        
         stream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
                 echoCancellation: false,
@@ -53,13 +84,36 @@ async function startRecording() {
             } 
         });
         
+        console.log('✅ Microphone access granted');
+        
+        // Update status to show microphone is working
+        statusDiv.textContent = '🎤 Microphone connected! Preparing to record...';
+        statusDiv.className = 'recording-status ready';
+        
         // Reset recorded chunks
         recordedChunks = [];
         
+        // Create MediaRecorder with fallback MIME types
+        let options = { mimeType: 'audio/webm;codecs=opus' };
+        
+        // Check for supported MIME types and use fallbacks
+        if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            if (MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/webm' };
+            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                options = { mimeType: 'audio/mp4' };
+            } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+                options = { mimeType: 'audio/wav' };
+            } else {
+                // Use default (no mimeType specified)
+                options = {};
+            }
+        }
+        
+        console.log('Using MediaRecorder options:', options);
+        
         // Create MediaRecorder
-        mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'audio/webm;codecs=opus'
-        });
+        mediaRecorder = new MediaRecorder(stream, options);
         
         // Handle data available event
         mediaRecorder.ondataavailable = function(event) {
@@ -92,7 +146,22 @@ async function startRecording() {
         
     } catch (error) {
         console.error('❌ Error starting recording:', error);
-        statusDiv.textContent = `❌ Error: ${error.message}. Please allow microphone access.`;
+        
+        let errorMessage = '';
+        
+        if (error.name === 'NotAllowedError') {
+            errorMessage = '❌ Microphone access denied. Please allow microphone access and try again.';
+        } else if (error.name === 'NotFoundError') {
+            errorMessage = '❌ No microphone found. Please connect a microphone and try again.';
+        } else if (error.name === 'NotSupportedError') {
+            errorMessage = '❌ Audio recording not supported in this browser. Try Chrome, Firefox, or Edge.';
+        } else if (error.name === 'AbortError') {
+            errorMessage = '❌ Recording was aborted. Please try again.';
+        } else {
+            errorMessage = `❌ Error: ${error.message}. Please check your microphone settings.`;
+        }
+        
+        statusDiv.textContent = errorMessage;
         statusDiv.className = 'recording-status error';
         
         // Reset button states
@@ -135,29 +204,37 @@ function processRecording() {
     }
     
     // Create blob from recorded chunks
-    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
     const audioUrl = URL.createObjectURL(blob);
     
-    console.log('✅ Audio blob created:', blob.size, 'bytes');
+    console.log('✅ Audio blob created:', blob.size, 'bytes', 'Type:', blob.type);
     
     // Set up playback
     playbackAudio.src = audioUrl;
     playbackAudio.load();
     
-    // Update recording info
+    // Update recording info with actual format
     const size = (blob.size / 1024).toFixed(2);
+    const format = blob.type || 'Unknown format';
     recordingInfo.innerHTML = `
         <strong>Recording Details:</strong><br>
         📏 Size: ${size} KB<br>
-        🕐 Format: WebM (Opus)<br>
+        🕐 Format: ${format}<br>
         🎤 Ready for playback!
     `;
     
-    // Set up download functionality
+    // Set up download functionality with proper file extension
     downloadBtn.onclick = function() {
         const link = document.createElement('a');
         link.href = audioUrl;
-        link.download = `echo-bot-recording-${new Date().toISOString().slice(0, 19)}.webm`;
+        
+        // Determine file extension based on MIME type
+        let extension = '.webm';
+        if (format.includes('mp4')) extension = '.mp4';
+        else if (format.includes('wav')) extension = '.wav';
+        else if (format.includes('ogg')) extension = '.ogg';
+        
+        link.download = `echo-bot-recording-${new Date().toISOString().slice(0, 19)}${extension}`;
         link.click();
     };
     
