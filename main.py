@@ -40,8 +40,22 @@ class TTSResponse(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
-    """Serve the main HTML page"""
-    with open("templates/index.html", "r") as file:
+    """Serve the home page"""
+    with open("templates/home.html", "r") as file:
+        html_content = file.read()
+    return HTMLResponse(content=html_content)
+
+@app.get("/tts", response_class=HTMLResponse)
+async def tts_page():
+    """Serve the TTS Generator page"""
+    with open("templates/tts.html", "r") as file:
+        html_content = file.read()
+    return HTMLResponse(content=html_content)
+
+@app.get("/echo", response_class=HTMLResponse)
+async def echo_page():
+    """Serve the Echo Bot page"""
+    with open("templates/echo.html", "r") as file:
         html_content = file.read()
     return HTMLResponse(content=html_content)
 

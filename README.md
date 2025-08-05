@@ -179,9 +179,76 @@ Take a screenshot of the running application and post on LinkedIn with:
 - Day 1 completion
 - #30DaysOfVoiceAgents hashtag
 
+## Day 4: Echo Bot with Voice Recording & Playback 🎙️
+
+**Goal**: Build an Echo Bot that records your voice and plays it back to you
+
+**Application Structure**: Multi-page web application with navigation
+- 🏠 **Home Page** (`/`) - Landing page with feature overview
+- 🔊 **TTS Generator** (`/tts`) - Text-to-speech functionality  
+- 🎙️ **Echo Bot** (`/echo`) - Voice recording and playback
+
+**Features Implemented**:
+- 🎤 Browser-based voice recording using MediaRecorder API
+- ⏺️ Start/Stop recording controls with visual feedback
+- 🔊 Instant audio playback of recorded voice
+- 💾 Download functionality for recorded audio
+- 🎨 Professional multi-page UI with navigation
+- 📱 Real-time microphone access and permission handling
+- 🔄 Audio processing with WebM/Opus format support
+
+**Technical Implementation**:
+- **Frontend**: HTML5 MediaRecorder API, Web Audio API, Multi-page SPA
+- **Backend**: FastAPI with multiple route handlers
+- **Audio Format**: WebM with Opus codec
+- **Recording Features**: Echo cancellation control, gain control
+- **Playbook**: HTML5 audio element with immediate feedback
+- **UI/UX**: Animated recording indicators, status messages, navigation
+- **Browser Support**: Modern browsers with microphone access
+
+**Key Code Components**:
+```python
+# FastAPI Multi-page Routes
+@app.get("/")
+async def read_root(): # Home page
+@app.get("/tts") 
+async def tts_page(): # TTS Generator
+@app.get("/echo")
+async def echo_page(): # Echo Bot
+```
+
+```html
+<!-- Navigation Component -->
+<nav class="navbar">
+    <h1>🎤 Voice Agents</h1>
+    <div class="nav-links">
+        <a href="/">🏠 Home</a>
+        <a href="/tts">🔊 TTS Generator</a>
+        <a href="/echo">🎙️ Echo Bot</a>
+    </div>
+</nav>
+```
+
+```javascript
+// MediaRecorder API Implementation
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+const mediaRecorder = new MediaRecorder(stream);
+mediaRecorder.start();
+// Process and playback recorded audio
+```
+
+**Learning Outcomes**:
+- Multi-page web application architecture
+- Browser audio API integration  
+- Real-time audio recording and processing
+- User permission handling for microphone access
+- Audio blob creation and URL generation
+- Cross-browser compatibility considerations
+- Navigation and UX design patterns
+
 ---
 
 **Challenge**: 30 Days of Voice Agents  
-**Day**: 3/30  
+**Day**: 4/30  
 **Status**: ✅ Complete  
-**Framework**: FastAPI + HTML/JS + Murf AI TTS + Audio Playback
+**Framework**: FastAPI + HTML/JS + Murf AI TTS + MediaRecorder API

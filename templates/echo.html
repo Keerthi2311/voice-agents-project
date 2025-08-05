@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Echo Bot - Voice Agents Project</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: white;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .nav-links a.active {
+            background: rgba(255, 255, 255, 0.4);
+            font-weight: bold;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .page-info {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+        
+        /* Echo Bot Styles */
+        .echo-section {
+            background: #f0f8ff;
+            border: 2px solid #b3d9ff;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .echo-title {
+            color: #1e3a8a;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .recording-controls {
+            margin: 20px 0;
+        }
+        
+        .record-btn {
+            background: linear-gradient(45deg, #ff4444, #cc3333);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 68, 68, 0.3);
+        }
+        
+        .record-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4);
+        }
+        
+        .record-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .recording-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        
+        .recording-status.recording {
+            background: #ffe6e6;
+            color: #cc0000;
+            border: 1px solid #ffcccc;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .recording-status.ready {
+            background: #e6ffe6;
+            color: #006600;
+            border: 1px solid #ccffcc;
+        }
+        
+        .recording-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .playback-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .playback-section h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+        
+        .recording-info {
+            margin-top: 15px;
+        }
+        
+        .download-btn {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .download-btn:hover {
+            background: linear-gradient(45deg, #20c997, #28a745);
+            transform: translateY(-1px);
+        }
+        
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .instructions {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .instructions h3 {
+            color: #1565c0;
+            margin-top: 0;
+        }
+        
+        .instructions ol {
+            color: #424242;
+            line-height: 1.6;
+        }
+        
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .record-btn {
+                display: block;
+                margin: 10px auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>🎤 Voice Agents</h1>
+        <div class="nav-links">
+            <a href="/">🏠 Home</a>
+            <a href="/tts">🔊 TTS Generator</a>
+            <a href="/echo" class="active">🎙️ Echo Bot</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <h1>🎙️ Echo Bot</h1>
+        <div class="page-info">Record your voice and hear it played back instantly</div>
+        
+        <div class="instructions">
+            <h3>📋 How to Use:</h3>
+            <ol>
+                <li>Click "Start Recording" and allow microphone access when prompted</li>
+                <li>Speak clearly into your microphone</li>
+                <li>Click "Stop Recording" when you're done</li>
+                <li>Your recording will automatically play back</li>
+                <li>Use the download button to save your recording</li>
+            </ol>
+        </div>
+        
+        <!-- Echo Bot Section -->
+        <div class="echo-section">
+            <div class="echo-title">🎤 Voice Recording & Playback</div>
+            <p>Record your voice and hear it played back to you!</p>
+            
+            <div class="recording-controls">
+                <button id="startRecordBtn" class="record-btn">🔴 Start Recording</button>
+                <button id="stopRecordBtn" class="record-btn" disabled>⏹️ Stop Recording</button>
+            </div>
+            
+            <div id="recordingStatus" class="recording-status"></div>
+            
+            <div id="playbackSection" class="playback-section" style="display: none;">
+                <h3>🔊 Your Recording:</h3>
+                <audio id="playbackAudio" controls>
+                    Your browser does not support the audio element.
+                </audio>
+                <div class="recording-info">
+                    <p id="recordingInfo"></p>
+                    <button id="downloadBtn" class="download-btn">💾 Download Recording</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/echo.js"></script>
+</body>
+</html>
