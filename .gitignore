@@ -94,6 +94,12 @@ node_modules/
 # Serverless directories
 .serverless
 
+# Uploads directory
+uploads/
+*.webm
+*.wav
+*.mp3
+
 # VS Code settings
 .vscode/settings.json
 .vscode/launch.json
