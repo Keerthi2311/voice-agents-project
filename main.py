@@ -1,10 +1,13 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
-import httpx
 import os
 from dotenv import load_dotenv
+import uvicorn
+import aiofiles
+from pathlib import Path
+import uuid
 import logging
 
 # Load environment variables
@@ -14,20 +17,19 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="Voice Agents Project - Day 2", 
-    version="2.0.0",
-    description="30 Days of Voice Agents Challenge - Now with TTS Integration!"
-)
+app = FastAPI(title="30 Days Voice Agents API")
 
-# Mount static files directory
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Ensure uploads directory exists
+uploads_dir = Path("uploads")
+uploads_dir.mkdir(exist_ok=True)
 
 # Pydantic models for request/response
 class TTSRequest(BaseModel):
     text: str
-    voice_id: str = "en-US-davis"  # Default voice
+    voice_id: str = "en-US-natalie"  # Default voice (Murf SDK format)
     speed: float = 1.0
     
 class TTSResponse(BaseModel):
@@ -59,116 +61,194 @@ async def echo_page():
         html_content = file.read()
     return HTMLResponse(content=html_content)
 
-@app.get("/api/hello")
-async def hello_api():
-    """Sample API endpoint"""
-    return {"message": "Hello from Voice Agents Backend!", "day": 2, "status": "success"}
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "day": 1}
 
-@app.get("/api/voice-status")
-async def voice_status():
-    """API endpoint for voice agent status"""
-    return {
-        "voice_agent": "initialized",
-        "features": ["text-to-speech", "speech-to-text", "voice-commands"],
-        "day": 2,
-        "challenge": "30 Days of Voice Agents",
-        "new_features": ["REST TTS API", "Murf AI Integration", "Audio Generation"]
-    }
-
-@app.post("/api/tts/generate", response_model=TTSResponse)
+@app.post("/generate-speech")
 async def generate_speech(request: TTSRequest):
-    """
-    Generate speech from text using Murf AI TTS API
+    """Generate speech using Murf TTS API - mapped to generate-audio"""
+    return await generate_audio(request)
+
+@app.post("/generate-audio")
+async def generate_audio(request: TTSRequest):
+    """Generate audio using Murf TTS SDK"""
     
-    - **text**: The text to convert to speech
-    - **voice_id**: Voice identifier (default: en-US-davis)
-    - **speed**: Speech speed (default: 1.0)
-    """
-    try:
-        logger.info(f"TTS request received: {request.text[:50]}...")
-        
-        # Get API key from environment
-        api_key = os.getenv("MURF_API_KEY")
-        base_url = os.getenv("MURF_BASE_URL", "https://api.murf.ai/v1")
-        
-        if not api_key or api_key == "your_murf_api_key_here":
-            # For demo purposes, return a mock response
-            logger.warning("No valid API key found, returning mock response")
-            return TTSResponse(
-                success=True,
-                audio_url="https://example.com/generated-audio-mock.mp3",
-                message="Mock TTS generation successful! (Replace with real Murf API key)",
-                text=request.text,
-                voice_id=request.voice_id
-            )
-        
-        # Prepare the request to Murf API
-        headers = {
-            "api-key": api_key,
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
+    murf_api_key = os.getenv("MURF_API_KEY")
+    if not murf_api_key or murf_api_key == "your_murf_api_key_here":
+        # For demo purposes, return a mock response
+        logger.warning("No valid API key found, returning mock response")
+        return {
+            "success": True,
+            "audio_url": "https://www2.cs.uic.edu/~i101/SoundFiles/BabyElephantWalk60.wav",
             "text": request.text,
-            "voice_id": request.voice_id,
-            "speed": request.speed,
-            "format": "mp3"
+            "message": "Mock TTS generation successful! (Replace with real Murf API key)"
+        }
+    
+    try:
+        # Import Murf SDK
+        from murf import Murf
+        
+        # Initialize Murf client
+        client = Murf(api_key=murf_api_key)
+        
+        # Generate speech using the SDK
+        response = client.text_to_speech.generate(
+            text=request.text,
+            voice_id=request.voice_id
+        )
+        
+        logger.info("TTS generation successful with Murf SDK")
+        
+        return {
+            "success": True,
+            "audio_url": response.audio_file,
+            "text": request.text,
+            "message": "TTS generation successful with Murf SDK!"
         }
         
-        # Make the API call to Murf
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{base_url}/speech/generate",
-                headers=headers,
-                json=payload,
-                timeout=30.0
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                logger.info("TTS generation successful")
-                
-                # Get audio URL from Murf's response format
-                audio_url = result.get("audioFile", "")
-                
-                return TTSResponse(
-                    success=True,
-                    audio_url=audio_url,
-                    message="TTS generation successful!",
-                    text=request.text,
-                    voice_id=request.voice_id
-                )
-            else:
-                logger.error(f"Murf API error: {response.status_code}")
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"Murf API error: {response.text}"
-                )
-                
-    except httpx.TimeoutException:
-        logger.error("TTS request timeout")
-        raise HTTPException(status_code=408, detail="TTS request timeout")
+    except ImportError:
+        logger.error("Murf SDK not installed")
+        return {
+            "success": False,
+            "audio_url": "",
+            "text": request.text,
+            "message": "Murf SDK not installed. Run: pip install murf"
+        }
     except Exception as e:
         logger.error(f"TTS generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
+
+@app.post("/upload-audio")
+async def upload_audio(audio: UploadFile = File(...)):
+    """Upload and temporarily save audio file"""
+    
+    try:
+        # Validate file type
+        if not audio.content_type or not audio.content_type.startswith('audio/'):
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid file type. Please upload an audio file."
+            )
+        
+        # Generate unique filename
+        file_extension = audio.filename.split('.')[-1] if '.' in audio.filename else 'webm'
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        file_path = uploads_dir / unique_filename
+        
+        # Save file
+        async with aiofiles.open(file_path, 'wb') as f:
+            content = await audio.read()
+            await f.write(content)
+        
+        # Get file stats
+        file_stats = file_path.stat()
+        
+        return {
+            "success": True,
+            "filename": unique_filename,
+            "original_filename": audio.filename,
+            "content_type": audio.content_type,
+            "size": file_stats.st_size,
+            "size_mb": round(file_stats.st_size / (1024 * 1024), 2),
+            "message": "File uploaded successfully"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.post("/transcribe/file")
+async def transcribe_audio_file(audio: UploadFile = File(...)):
+    """Transcribe audio file using AssemblyAI"""
+    
+    try:
+        # Validate file type
+        if not audio.content_type or not audio.content_type.startswith('audio/'):
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid file type. Please upload an audio file."
+            )
+        
+        assemblyai_api_key = os.getenv("ASSEMBLYAI_API_KEY")
+        if not assemblyai_api_key or assemblyai_api_key == "your_assemblyai_api_key_here":
+            # For demo purposes, return a mock response
+            logger.warning("No valid AssemblyAI API key found, returning mock response")
+            return {
+                "success": True,
+                "transcript": "This is a mock transcription. Please add your AssemblyAI API key to enable real transcription.",
+                "confidence": 0.95,
+                "status": "completed",
+                "audio_duration": 3.5,
+                "words_count": 15,
+                "message": "Mock transcription completed (Replace with real AssemblyAI API key)"
+            }
+        
+        # Read audio file content
+        audio_content = await audio.read()
+        
+        try:
+            import assemblyai as aai
+            # Configure AssemblyAI
+            aai.settings.api_key = assemblyai_api_key
+            
+            # Initialize AssemblyAI transcriber
+            transcriber = aai.Transcriber()
+            
+            # Transcribe the audio data directly
+            transcript = transcriber.transcribe(audio_content)
+            
+            # Check if transcription was successful
+            if transcript.status == aai.TranscriptStatus.error:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Transcription failed: {transcript.error}"
+                )
+            
+            # Return transcription results
+            return {
+                "success": True,
+                "transcript": transcript.text,
+                "confidence": transcript.confidence,
+                "status": transcript.status.value,
+                "audio_duration": transcript.audio_duration,
+                "words_count": len(transcript.text.split()) if transcript.text else 0,
+                "message": "Transcription completed successfully"
+            }
+        except ImportError:
+            logger.warning("AssemblyAI not installed, using mock response")
+            return {
+                "success": True,
+                "transcript": "AssemblyAI module not installed. Run: pip install assemblyai",
+                "confidence": 0.95,
+                "status": "completed",
+                "audio_duration": 3.5,
+                "words_count": 10,
+                "message": "Mock transcription (AssemblyAI not installed)"
+            }
+        
+    except Exception as e:
+        # Log the error for debugging
+        logger.error(f"Transcription error: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Transcription failed: {str(e)}"
+        )
 
 @app.get("/api/tts/voices")
 async def get_available_voices():
     """Get list of available TTS voices"""
     return {
         "voices": [
+            {"id": "en-US-natalie", "name": "Natalie (US Female)", "language": "en-US"},
             {"id": "en-US-cooper", "name": "Cooper (US Male)", "language": "en-US"},
             {"id": "en-US-samantha", "name": "Samantha (US Female)", "language": "en-US"},
             {"id": "en-UK-hazel", "name": "Hazel (UK Female)", "language": "en-UK"},
             {"id": "en-AU-ivy", "name": "Ivy (AU Female)", "language": "en-AU"},
-            {"id": "en-US-wayne", "name": "Wayne (US Male)", "language": "en-US"}
         ],
-        "default": "en-US-cooper",
-        "day": 3
+        "default": "en-US-natalie",
+        "sdk": "murf-python-sdk",
+        "day": 6
     }
 
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8001))
-    host = os.getenv("HOST", "0.0.0.0")
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

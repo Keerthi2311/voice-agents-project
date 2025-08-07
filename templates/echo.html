@@ -147,6 +147,82 @@
             border: 1px solid #f5c6cb;
         }
         
+        /* Upload Status Styles */
+        .upload-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        
+        .upload-status.uploading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .upload-status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .upload-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* Transcription Status Styles */
+        .transcription-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        
+        .transcription-status.uploading {
+            background: #e2e3e5;
+            color: #495057;
+            border: 1px solid #ced4da;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .transcription-status.success {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .transcription-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* Transcription Results Styles */
+        .transcription-text {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            font-style: italic;
+            line-height: 1.5;
+        }
+        
+        .transcription-details {
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -347,7 +423,14 @@
                 <div class="step">
                     <div class="step-number">5</div>
                     <div class="step-content">
-                        <h4>💾 Download</h4>
+                        <h4>� Auto Transcription</h4>
+                        <p>Your speech will be automatically transcribed using AssemblyAI</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <h4>�💾 Download</h4>
                         <p>Save your recording as an audio file to keep it</p>
                     </div>
                 </div>
@@ -375,6 +458,14 @@
                     <p id="recordingInfo"></p>
                     <button id="downloadBtn" class="download-btn">💾 Download Recording</button>
                 </div>
+            </div>
+
+            <!-- Day 6: Transcription Section -->
+            <div id="transcriptionSection" class="transcription-section" style="display: none;">
+                <h3>📝 Speech Transcription</h3>
+                <div id="transcriptionStatus" class="transcription-status"></div>
+                <div id="transcriptionText" class="transcription-text"></div>
+                <div id="transcriptionDetails" class="transcription-details"></div>
             </div>
         </div>
     </div>

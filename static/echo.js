@@ -188,7 +188,7 @@ function stopRecording() {
     }
 }
 
-function processRecording() {
+async function processRecording() {
     console.log('🔄 Processing recording...', recordedChunks.length, 'chunks');
     
     const statusDiv = document.getElementById('recordingStatus');
@@ -242,8 +242,14 @@ function processRecording() {
     playbackSection.style.display = 'block';
     
     // Update status
-    statusDiv.textContent = '✅ Recording complete! You can now play it back below.';
-    statusDiv.className = 'recording-status ready';
+    statusDiv.textContent = '✅ Recording complete! Uploading to server...';
+    statusDiv.className = 'recording-status uploading';
+    
+    // Day 5: Upload audio to server
+    await uploadAudioToServer(blob);
+    
+    // Day 6: Transcribe audio
+    await transcribeAudio(blob);
     
     // Auto-play the recording (if browser allows)
     setTimeout(() => {
@@ -251,6 +257,167 @@ function processRecording() {
             console.log('Autoplay prevented:', error.message);
         });
     }, 500);
+}
+
+// Day 5: Upload audio to server
+async function uploadAudioToServer(audioBlob) {
+    const statusDiv = document.getElementById('recordingStatus');
+    const uploadStatus = document.getElementById('uploadStatus') || createUploadStatusDiv();
+    
+    try {
+        uploadStatus.textContent = '📤 Uploading audio to server...';
+        uploadStatus.className = 'upload-status uploading';
+        
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+
+        const response = await fetch('/upload-audio', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            uploadStatus.textContent = `✅ Upload successful! File: ${result.filename} (${result.size_mb}MB)`;
+            uploadStatus.className = 'upload-status success';
+            console.log('Upload details:', result);
+        } else {
+            throw new Error(result.detail || 'Upload failed');
+        }
+
+    } catch (error) {
+        console.error('Upload error:', error);
+        uploadStatus.textContent = `❌ Upload failed: ${error.message}`;
+        uploadStatus.className = 'upload-status error';
+    }
+}
+
+// Day 6: Transcribe audio
+async function transcribeAudio(audioBlob) {
+    const transcriptionStatus = document.getElementById('transcriptionStatus') || createTranscriptionStatusDiv();
+    const transcriptionSection = document.getElementById('transcriptionSection') || createTranscriptionSection();
+    
+    try {
+        transcriptionStatus.textContent = '🎯 Transcribing audio...';
+        transcriptionStatus.className = 'transcription-status uploading';
+        
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+
+        const response = await fetch('/transcribe/file', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            displayTranscription(result);
+            transcriptionStatus.textContent = '✅ Transcription completed successfully!';
+            transcriptionStatus.className = 'transcription-status success';
+        } else {
+            throw new Error(result.detail || 'Transcription failed');
+        }
+
+    } catch (error) {
+        console.error('Transcription error:', error);
+        transcriptionStatus.textContent = `❌ Transcription failed: ${error.message}`;
+        transcriptionStatus.className = 'transcription-status error';
+    }
+}
+
+// Display transcription results
+function displayTranscription(result) {
+    const transcriptionText = document.getElementById('transcriptionText') || createTranscriptionTextDiv();
+    const transcriptionDetails = document.getElementById('transcriptionDetails') || createTranscriptionDetailsDiv();
+    
+    // Show transcription section
+    const transcriptionSection = document.getElementById('transcriptionSection');
+    if (transcriptionSection) {
+        transcriptionSection.style.display = 'block';
+    }
+    
+    // Display the transcribed text
+    if (result.transcript && result.transcript.trim()) {
+        transcriptionText.innerHTML = `<strong>Transcript:</strong><br>"${result.transcript}"`;
+    } else {
+        transcriptionText.innerHTML = '<strong>Transcript:</strong><br><em>No speech detected in the recording.</em>';
+    }
+    
+    // Display transcription details
+    transcriptionDetails.innerHTML = `
+        <strong>Details:</strong><br>
+        📊 Confidence: ${Math.round((result.confidence || 0.95) * 100)}%<br>
+        ⏱️ Duration: ${result.audio_duration || 'N/A'}s<br>
+        📝 Words: ${result.words_count || 0}<br>
+        🔥 Status: ${result.status || 'completed'}
+    `;
+}
+
+// Helper function to create upload status div if it doesn't exist
+function createUploadStatusDiv() {
+    const uploadStatus = document.createElement('div');
+    uploadStatus.id = 'uploadStatus';
+    uploadStatus.className = 'upload-status';
+    
+    const playbackSection = document.getElementById('playbackSection');
+    if (playbackSection) {
+        playbackSection.appendChild(uploadStatus);
+    }
+    
+    return uploadStatus;
+}
+
+// Helper function to create transcription status div if it doesn't exist
+function createTranscriptionStatusDiv() {
+    const transcriptionStatus = document.createElement('div');
+    transcriptionStatus.id = 'transcriptionStatus';
+    transcriptionStatus.className = 'transcription-status';
+    
+    const playbackSection = document.getElementById('playbackSection');
+    if (playbackSection) {
+        playbackSection.appendChild(transcriptionStatus);
+    }
+    
+    return transcriptionStatus;
+}
+
+// Helper function to create transcription section if it doesn't exist
+function createTranscriptionSection() {
+    const transcriptionSection = document.createElement('div');
+    transcriptionSection.id = 'transcriptionSection';
+    transcriptionSection.style.display = 'none';
+    transcriptionSection.innerHTML = `
+        <h3>📝 Transcription Results</h3>
+        <div id="transcriptionText" class="transcription-text"></div>
+        <div id="transcriptionDetails" class="transcription-details"></div>
+    `;
+    
+    const playbackSection = document.getElementById('playbackSection');
+    if (playbackSection) {
+        playbackSection.appendChild(transcriptionSection);
+    }
+    
+    return transcriptionSection;
+}
+
+// Helper function to create transcription text div if it doesn't exist
+function createTranscriptionTextDiv() {
+    const transcriptionText = document.createElement('div');
+    transcriptionText.id = 'transcriptionText';
+    transcriptionText.className = 'transcription-text';
+    
+    return transcriptionText;
+}
+
+// Helper function to create transcription details div if it doesn't exist
+function createTranscriptionDetailsDiv() {
+    const transcriptionDetails = document.createElement('div');
+    transcriptionDetails.id = 'transcriptionDetails';
+    transcriptionDetails.className = 'transcription-details';
+    
+    return transcriptionDetails;
 }
 
 // Add visual feedback for microphone access
