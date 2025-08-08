@@ -242,21 +242,100 @@ async function processRecording() {
     playbackSection.style.display = 'block';
     
     // Update status
-    statusDiv.textContent = '✅ Recording complete! Uploading to server...';
+    statusDiv.textContent = '✅ Recording complete! Processing with Murf AI...';
     statusDiv.className = 'recording-status uploading';
     
-    // Day 5: Upload audio to server
-    await uploadAudioToServer(blob);
+    // Day 7: Echo Bot v2 - Transcribe and replay with Murf voice
+    await echoWithMurfVoice(blob);
     
-    // Day 6: Transcribe audio
-    await transcribeAudio(blob);
+    // Auto-play will happen after Murf audio is ready
+}
+
+// Day 7: Echo Bot v2 - Transcribe and replay with Murf voice
+async function echoWithMurfVoice(audioBlob) {
+    const statusDiv = document.getElementById('recordingStatus');
+    const playbackAudio = document.getElementById('playbackAudio');
+    const recordingInfo = document.getElementById('recordingInfo');
+    const transcriptionSection = document.getElementById('transcriptionSection') || createTranscriptionSection();
+    const transcriptionStatus = document.getElementById('transcriptionStatus') || createTranscriptionStatusDiv();
     
-    // Auto-play the recording (if browser allows)
-    setTimeout(() => {
-        playbackAudio.play().catch(error => {
-            console.log('Autoplay prevented:', error.message);
+    try {
+        console.log('🎯 Day 7: Starting Echo Bot v2 with Murf voice...');
+        
+        // Update status
+        statusDiv.textContent = '🎯 Transcribing and generating Murf voice...';
+        statusDiv.className = 'recording-status uploading';
+        
+        transcriptionStatus.textContent = '🎤 Processing your voice with AI...';
+        transcriptionStatus.className = 'transcription-status uploading';
+        
+        // Show transcription section
+        transcriptionSection.style.display = 'block';
+        
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+
+        const response = await fetch('/tts/echo', {
+            method: 'POST',
+            body: formData
         });
-    }, 500);
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            console.log('✅ Day 7: Echo Bot v2 successful!', result);
+            
+            // Update status
+            statusDiv.textContent = '✅ Echo Bot v2 complete! Listen to your Murf voice below.';
+            statusDiv.className = 'recording-status success';
+            
+            transcriptionStatus.textContent = '✅ Transcription and voice generation completed!';
+            transcriptionStatus.className = 'transcription-status success';
+            
+            // Display what was transcribed
+            const transcriptionText = document.getElementById('transcriptionText');
+            if (transcriptionText) {
+                transcriptionText.innerHTML = `
+                    <div class="transcription-result">
+                        <h4>📝 What you said:</h4>
+                        <p>"${result.original_text}"</p>
+                    </div>
+                `;
+            }
+            
+            // Update recording info
+            recordingInfo.innerHTML = `
+                <strong>Echo Bot v2 (Day 7):</strong><br>
+                🎤 Original: Your voice<br>
+                🤖 Murf Voice: ${result.voice_id}<br>
+                📝 Transcribed: ${result.original_text.substring(0, 50)}...<br>
+                🎯 Status: Ready to play!
+            `;
+            
+            // Set the Murf-generated audio URL
+            playbackAudio.src = result.audio_url;
+            playbackAudio.load();
+            
+            // Auto-play the Murf audio
+            setTimeout(() => {
+                playbackAudio.play().catch(error => {
+                    console.log('Autoplay prevented:', error.message);
+                    statusDiv.textContent = '✅ Echo Bot v2 ready! Click play to hear your voice in Murf AI.';
+                });
+            }, 1000);
+            
+        } else {
+            throw new Error(result.detail || 'Echo Bot v2 failed');
+        }
+
+    } catch (error) {
+        console.error('❌ Day 7 Echo Bot v2 error:', error);
+        statusDiv.textContent = `❌ Echo Bot v2 failed: ${error.message}`;
+        statusDiv.className = 'recording-status error';
+        
+        transcriptionStatus.textContent = `❌ Processing failed: ${error.message}`;
+        transcriptionStatus.className = 'transcription-status error';
+    }
 }
 
 // Day 5: Upload audio to server

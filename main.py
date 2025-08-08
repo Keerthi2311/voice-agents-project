@@ -119,6 +119,80 @@ async def generate_audio(request: TTSRequest):
         logger.error(f"TTS generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
 
+@app.post("/tts/echo")
+async def echo_with_murf_voice(audio: UploadFile = File(...)):
+    """
+    Day 7: Echo Bot v2 - Transcribe audio and replay with Murf voice
+    
+    - **audio**: Audio file to transcribe and echo back with Murf voice
+    """
+    try:
+        logger.info("Day 7: Echo Bot v2 request received")
+        
+        # Validate file type
+        if not audio.content_type or not audio.content_type.startswith('audio/'):
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid file type. Please upload an audio file."
+            )
+        
+        # Read audio content
+        audio_content = await audio.read()
+        logger.info(f"Audio file size: {len(audio_content)} bytes")
+        
+        # Step 1: Transcribe the audio using AssemblyAI
+        logger.info("Step 1: Transcribing audio with AssemblyAI...")
+        
+        assemblyai_api_key = os.getenv("ASSEMBLYAI_API_KEY")
+        if not assemblyai_api_key or assemblyai_api_key == "your_assemblyai_api_key_here":
+            raise HTTPException(status_code=500, detail="AssemblyAI API key not configured")
+        
+        import assemblyai as aai
+        aai.settings.api_key = assemblyai_api_key
+        
+        # Create transcriber and transcribe
+        transcriber = aai.Transcriber()
+        transcript = transcriber.transcribe(audio_content)
+        
+        if transcript.status == aai.TranscriptStatus.error:
+            raise HTTPException(status_code=500, detail=f"Transcription failed: {transcript.error}")
+        
+        transcribed_text = transcript.text
+        logger.info(f"Transcription successful: {transcribed_text[:100]}...")
+        
+        # Step 2: Generate Murf audio from transcription
+        logger.info("Step 2: Generating Murf audio from transcription...")
+        
+        murf_api_key = os.getenv("MURF_API_KEY")
+        if not murf_api_key or murf_api_key == "your_murf_api_key_here":
+            raise HTTPException(status_code=500, detail="Murf API key not configured")
+        
+        from murf import Murf
+        
+        # Initialize Murf client
+        client = Murf(api_key=murf_api_key)
+        
+        # Generate speech using Murf SDK with a nice voice
+        response = client.text_to_speech.generate(
+            text=transcribed_text,
+            voice_id="en-US-cooper"  # Nice male voice
+        )
+        
+        logger.info("Day 7: Echo Bot v2 completed successfully!")
+        
+        return {
+            "success": True,
+            "original_text": transcribed_text,
+            "audio_url": response.audio_file,
+            "voice_id": "en-US-cooper",
+            "message": "Echo Bot v2: Your voice transcribed and spoken back by Murf AI!",
+            "day": 7
+        }
+        
+    except Exception as e:
+        logger.error(f"Day 7 Echo Bot v2 failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Echo Bot v2 failed: {str(e)}")
+
 @app.post("/upload-audio")
 async def upload_audio(audio: UploadFile = File(...)):
     """Upload and temporarily save audio file"""
