@@ -193,6 +193,63 @@ async def echo_with_murf_voice(audio: UploadFile = File(...)):
         logger.error(f"Day 7 Echo Bot v2 failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Echo Bot v2 failed: {str(e)}")
 
+# Pydantic model for LLM request
+class LLMRequest(BaseModel):
+    text: str
+
+@app.post("/llm/query")
+async def query_llm(request: LLMRequest):
+    """
+    Day 8: Large Language Model Integration with Google Gemini
+    
+    - **text**: Input text to send to the LLM for processing
+    """
+    try:
+        logger.info(f"Day 8: LLM query request received: {request.text[:100]}...")
+        
+        # Get Gemini API key from environment
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_api_key or gemini_api_key == "your_gemini_api_key_here":
+            # For demo purposes, return a mock response
+            logger.warning("No valid Gemini API key found, returning mock response")
+            return {
+                "success": True,
+                "input_text": request.text,
+                "response": f"This is a mock response from Gemini AI for your input: '{request.text}'. To get real AI responses, please add your GEMINI_API_KEY to the .env file. Get your free API key at: https://ai.google.dev/gemini-api/docs/quickstart",
+                "model": "gemini-pro (mock)",
+                "message": "Mock LLM response - Add real Gemini API key for actual AI responses",
+                "day": 8
+            }
+        
+        # Import and configure Gemini
+        import google.generativeai as genai
+        genai.configure(api_key=gemini_api_key)
+        
+        # Initialize the model
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Generate response
+        logger.info("Sending request to Google Gemini...")
+        response = model.generate_content(request.text)
+        
+        logger.info("Day 8: LLM query completed successfully!")
+        
+        return {
+            "success": True,
+            "input_text": request.text,
+            "response": response.text,
+            "model": "gemini-1.5-flash",
+            "message": "LLM query processed successfully with Google Gemini!",
+            "day": 8
+        }
+        
+    except ImportError:
+        logger.error("Google Generative AI library not installed")
+        raise HTTPException(status_code=500, detail="Google Generative AI library not installed. Run: pip install google-generativeai")
+    except Exception as e:
+        logger.error(f"Day 8 LLM query failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"LLM query failed: {str(e)}")
+
 @app.post("/upload-audio")
 async def upload_audio(audio: UploadFile = File(...)):
     """Upload and temporarily save audio file"""
