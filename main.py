@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
@@ -12,6 +12,8 @@ import logging
 import time
 import requests
 import io
+from typing import List, Dict, Any
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +30,48 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Ensure uploads directory exists
 uploads_dir = Path("uploads")
 uploads_dir.mkdir(exist_ok=True)
+
+# In-memory chat history storage (for prototype)
+# Format: {session_id: [{"role": "user"|"assistant", "content": str, "timestamp": datetime}, ...]}
+chat_history_store: Dict[str, List[Dict[str, Any]]] = {}
+
+# Helper functions for chat history management
+def get_chat_history(session_id: str) -> List[Dict[str, Any]]:
+    """Get chat history for a session"""
+    return chat_history_store.get(session_id, [])
+
+def add_to_chat_history(session_id: str, role: str, content: str):
+    """Add a message to chat history"""
+    if session_id not in chat_history_store:
+        chat_history_store[session_id] = []
+    
+    chat_history_store[session_id].append({
+        "role": role,
+        "content": content,
+        "timestamp": datetime.now()
+    })
+    
+    # Keep only last 20 messages to prevent memory issues
+    if len(chat_history_store[session_id]) > 20:
+        chat_history_store[session_id] = chat_history_store[session_id][-20:]
+
+def format_chat_history_for_llm(session_id: str) -> str:
+    """Format chat history for LLM context"""
+    history = get_chat_history(session_id)
+    if not history:
+        return ""
+    
+    formatted_history = "Previous conversation:\n"
+    for message in history:
+        role_label = "Human" if message["role"] == "user" else "Assistant"
+        formatted_history += f"{role_label}: {message['content']}\n"
+    
+    return formatted_history + "\n"
+
+def clear_chat_history(session_id: str):
+    """Clear chat history for a session"""
+    if session_id in chat_history_store:
+        del chat_history_store[session_id]
 
 # Pydantic models for request/response
 class TTSRequest(BaseModel):
@@ -70,6 +114,18 @@ async def voice_pipeline_page():
     with open("templates/voice_pipeline.html", "r") as file:
         html_content = file.read()
     return HTMLResponse(content=html_content)
+
+@app.get("/conversational-agent", response_class=HTMLResponse)
+async def conversational_agent_page():
+    """Serve the Conversational Agent page - Day 10"""
+    with open("templates/conversational_agent.html", "r") as file:
+        html_content = file.read()
+    return HTMLResponse(content=html_content)
+
+@app.get("/chat")
+async def chat_interface_redirect():
+    """Redirect to the unified Conversational Agent - Day 10"""
+    return RedirectResponse(url="/conversational-agent", status_code=301)
 
 @app.get("/health")
 async def health_check():
@@ -519,6 +575,340 @@ User's question (simulated): {transcribed_text}"""
         except:
             pass
         raise HTTPException(status_code=500, detail=f"LLM query failed: {str(e)}")
+
+@app.post("/agent/chat/{session_id}")
+async def conversational_agent_chat(session_id: str, audio_file: UploadFile = File(...)):
+    """
+    Day 10: Conversational Agent with Chat History
+    
+    Complete pipeline with memory: Audio Input → Transcription → Chat History → LLM → Voice Synthesis
+    
+    - **session_id**: Unique session identifier for maintaining chat history
+    - **audio_file**: Audio file to transcribe and process in conversation context
+    """
+    try:
+        logger.info(f"Day 10: Conversational chat request for session {session_id} - Audio file: {audio_file.filename}")
+        
+        # Validate file
+        if not audio_file.filename.lower().endswith(('.wav', '.mp3', '.m4a', '.webm', '.ogg')):
+            raise HTTPException(status_code=400, detail="Unsupported audio format. Use WAV, MP3, M4A, WebM, or OGG.")
+        
+        # Create uploads directory if it doesn't exist
+        uploads_dir = "uploads"
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        # Save uploaded file
+        timestamp = int(time.time())
+        original_filename = f"chat_{session_id}_{timestamp}_{audio_file.filename}"
+        audio_path = os.path.join(uploads_dir, original_filename)
+        
+        with open(audio_path, "wb") as f:
+            audio_content = await audio_file.read()
+            f.write(audio_content)
+        
+        logger.info(f"Audio file saved: {audio_path} (size: {len(audio_content)} bytes)")
+        
+        # Step 1: Transcribe audio using AssemblyAI
+        logger.info("Step 1: Transcribing audio with AssemblyAI...")
+        assemblyai_api_key = os.getenv("ASSEMBLYAI_API_KEY")
+        if not assemblyai_api_key or assemblyai_api_key == "your_assemblyai_api_key_here":
+            # Demo mode - return mock transcription based on session history
+            logger.warning("No valid AssemblyAI API key found, using demo mode")
+            history_length = len(get_chat_history(session_id))
+            if history_length == 0:
+                transcribed_text = "Hello! I'm excited to have a conversation with you. What would you like to talk about today?"
+            elif history_length == 1:
+                transcribed_text = "That sounds interesting! Can you tell me more about that?"
+            elif history_length == 2:
+                transcribed_text = "I see. What's your opinion on this topic?"
+            else:
+                transcribed_text = "Thanks for sharing that! Is there anything else you'd like to discuss?"
+        else:
+            try:
+                # Real AssemblyAI transcription with improved audio format handling
+                headers = {"authorization": assemblyai_api_key}
+                
+                # Convert audio to WAV format for better compatibility
+                logger.info(f"Processing audio file for transcription...")
+                
+                try:
+                    # Try to convert to WAV using ffmpeg (if available)
+                    wav_path = audio_path.replace(os.path.splitext(audio_path)[1], '.wav')
+                    
+                    import subprocess
+                    result = subprocess.run([
+                        'ffmpeg', '-i', audio_path, '-acodec', 'pcm_s16le', 
+                        '-ar', '16000', '-ac', '1', wav_path, '-y'
+                    ], capture_output=True, text=True, timeout=30)
+                    
+                    if result.returncode == 0 and os.path.exists(wav_path):
+                        logger.info(f"Successfully converted to WAV: {wav_path}")
+                        upload_file_path = wav_path
+                    else:
+                        logger.warning(f"FFmpeg conversion failed, using original file")
+                        upload_file_path = audio_path
+                        
+                except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
+                    logger.warning(f"Audio conversion failed: {e}, using original file")
+                    upload_file_path = audio_path
+                
+                logger.info(f"Uploading audio file: {upload_file_path}")
+                
+                # Upload with proper binary handling
+                with open(upload_file_path, "rb") as f:
+                    audio_data = f.read()
+                    
+                upload_response = requests.post(
+                    "https://api.assemblyai.com/v2/upload",
+                    headers={
+                        "authorization": assemblyai_api_key,
+                        "content-type": "application/octet-stream"
+                    },
+                    data=audio_data
+                )
+                
+                if upload_response.status_code != 200:
+                    logger.error(f"AssemblyAI upload failed: {upload_response.status_code} - {upload_response.text}")
+                    raise Exception(f"Upload failed: {upload_response.text}")
+                
+                upload_url = upload_response.json()["upload_url"]
+                logger.info(f"Audio uploaded to AssemblyAI: {upload_url}")
+                
+                # Submit for transcription with enhanced settings
+                transcript_request = {
+                    "audio_url": upload_url,
+                    "speech_model": "best",
+                    "language_detection": True,
+                    "punctuate": True,
+                    "format_text": True
+                }
+                
+                transcript_response = requests.post(
+                    "https://api.assemblyai.com/v2/transcript",
+                    headers=headers,
+                    json=transcript_request
+                )
+                
+                if transcript_response.status_code != 200:
+                    logger.error(f"AssemblyAI transcription request failed: {transcript_response.status_code} - {transcript_response.text}")
+                    raise Exception(f"Transcription request failed: {transcript_response.text}")
+                
+                transcript_id = transcript_response.json()["id"]
+                logger.info(f"Transcription submitted with ID: {transcript_id}")
+                
+                # Poll for transcription completion
+                max_attempts = 60  # 5 minutes max
+                for attempt in range(max_attempts):
+                    logger.info(f"Checking transcription status (attempt {attempt + 1}/60)...")
+                    status_response = requests.get(
+                        f"https://api.assemblyai.com/v2/transcript/{transcript_id}",
+                        headers=headers
+                    )
+                    
+                    if status_response.status_code == 200:
+                        result = status_response.json()
+                        logger.info(f"Transcription status: {result['status']}")
+                        
+                        if result["status"] == "completed":
+                            transcribed_text = result["text"]
+                            if not transcribed_text or transcribed_text.strip() == "":
+                                logger.warning("Transcription returned empty text, using demo mode")
+                                transcribed_text = "Hello, I'm here for our conversation. How can I help you today?"
+                            else:
+                                logger.info(f"Transcription completed: {transcribed_text[:100]}...")
+                            break
+                        elif result["status"] == "error":
+                            error_detail = result.get("error", "Unknown transcription error")
+                            logger.error(f"AssemblyAI transcription error: {error_detail}")
+                            raise Exception(f"Transcription failed: {error_detail}")
+                    else:
+                        logger.error(f"Status check failed: {status_response.status_code} - {status_response.text}")
+                    
+                    time.sleep(5)
+                else:
+                    raise Exception("Transcription timed out")
+                    
+            except Exception as e:
+                # Fallback to demo mode if transcription fails
+                logger.warning(f"Transcription failed, falling back to demo mode: {str(e)}")
+                history_length = len(get_chat_history(session_id))
+                if history_length == 0:
+                    transcribed_text = f"Hello! I'd love to have a conversation with you. (Demo: transcription failed - '{str(e)[:50]}...', but let's chat anyway!)"
+                else:
+                    transcribed_text = f"That's interesting! Can you elaborate on that? (Demo: transcription failed but conversation continues)"
+        
+        # Step 2: Add user message to chat history
+        logger.info("Step 2: Adding user message to chat history...")
+        add_to_chat_history(session_id, "user", transcribed_text)
+        
+        # Step 3: Get chat history and send to LLM with context
+        logger.info("Step 3: Processing conversation with Google Gemini...")
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_api_key or gemini_api_key == "your_gemini_api_key_here":
+            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+        
+        # Configure Gemini
+        import google.generativeai as genai
+        genai.configure(api_key=gemini_api_key)
+        
+        # Initialize the model
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Get chat history and format for LLM
+        chat_context = format_chat_history_for_llm(session_id)
+        
+        # Create enhanced prompt with conversation context
+        conversation_prompt = f"""You are a helpful, friendly AI assistant having a natural conversation. Keep your responses conversational, engaging, and under 2000 characters for voice synthesis.
+
+{chat_context}
+
+Current user message: {transcribed_text}
+
+Please respond in a natural, conversational way. Remember the context of our previous conversation and build upon it. Ask follow-up questions to keep the conversation engaging."""
+        
+        # Generate response
+        llm_response = model.generate_content(conversation_prompt)
+        llm_text = llm_response.text
+        
+        # Ensure response is under 2500 characters for Murf API
+        if len(llm_text) > 2200:
+            # Truncate and add ending
+            llm_text = llm_text[:2100] + "... What would you like to know more about?"
+        
+        logger.info(f"LLM response generated: {llm_text[:100]}...")
+        
+        # Step 4: Add assistant response to chat history
+        logger.info("Step 4: Adding assistant response to chat history...")
+        add_to_chat_history(session_id, "assistant", llm_text)
+        
+        # Step 5: Convert LLM response to speech using Murf AI
+        logger.info("Step 5: Converting response to speech with Murf AI...")
+        murf_api_key = os.getenv("MURF_API_KEY")
+        if not murf_api_key or murf_api_key == "your_murf_api_key_here":
+            logger.warning("No valid Murf AI API key found, using demo mode")
+            audio_url = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuW2e/LdCUELIHQ8tiJOQcZZ7zl559NEApPqOPxtmMcBQeA5"
+            voice_info = "Demo voice (Murf AI key required for real voice synthesis)"
+        else:
+            try:
+                # Murf TTS request
+                murf_headers = {
+                    "api-key": murf_api_key,
+                    "Content-Type": "application/json"
+                }
+                
+                murf_payload = {
+                    "voiceId": "en-US-ken",  # Professional male voice
+                    "style": "Conversational",
+                    "text": llm_text,
+                    "rate": 0,
+                    "pitch": 0,
+                    "sampleRate": 48000,
+                    "format": "MP3",
+                    "channelType": "STEREO",
+                    "pronunciationDictionary": {},
+                    "encodeAsBase64": False,
+                    "variation": 1,
+                    "audioDuration": 0,
+                    "modelVersion": "GEN2"
+                }
+                
+                murf_response = requests.post(
+                    "https://api.murf.ai/v1/speech/generate",
+                    headers=murf_headers,
+                    json=murf_payload
+                )
+                
+                if murf_response.status_code != 200:
+                    logger.error(f"Murf API error: {murf_response.status_code} - {murf_response.text}")
+                    raise Exception(f"Murf API request failed: {murf_response.text}")
+                
+                murf_result = murf_response.json()
+                logger.info(f"Murf API response received")
+                
+                # Check for audio file URL
+                audio_url = murf_result.get("audioFile")
+                if not audio_url:
+                    error_msg = murf_result.get("error", "No audio file URL returned")
+                    logger.error(f"Murf API failed: {error_msg}")
+                    raise Exception(f"Murf AI speech generation failed: {error_msg}")
+                
+                voice_info = "en-US-ken (Murf AI)"
+                logger.info(f"Murf AI speech generated successfully")
+                
+            except Exception as e:
+                # Fallback to demo mode if Murf AI fails
+                logger.warning(f"Murf AI failed, falling back to demo mode: {str(e)}")
+                audio_url = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuW2e/LdCUELIHQ8tiJOQcZZ7zl559NEApPqOPxtmMcBQeA5"
+                voice_info = f"Demo voice (Murf AI error: {str(e)[:100]}...)"
+        
+        logger.info(f"Day 10: Conversational chat completed for session {session_id}")
+        
+        # Clean up uploaded files
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+            
+        # Clean up converted WAV file if it exists
+        wav_path = audio_path.replace(os.path.splitext(audio_path)[1], '.wav')
+        if os.path.exists(wav_path) and wav_path != audio_path:
+            os.remove(wav_path)
+        
+        # Get current chat history for response
+        current_history = get_chat_history(session_id)
+        
+        return {
+            "success": True,
+            "session_id": session_id,
+            "transcribed_text": transcribed_text,
+            "llm_response": llm_text,
+            "audio_url": audio_url,
+            "model": "gemini-1.5-flash",
+            "voice": voice_info,
+            "chat_history_length": len(current_history),
+            "message": "Conversational chat completed with memory!",
+            "day": 10,
+            "pipeline_steps": [
+                "✅ Audio uploaded and saved",
+                "✅ Audio transcribed with AssemblyAI (or demo mode)",
+                "✅ Message added to chat history",
+                "✅ Conversation processed with Google Gemini + history context",
+                "✅ Response converted to speech with Murf AI (or demo mode)",
+                "✅ Assistant response saved to chat history"
+            ]
+        }
+        
+    except ImportError:
+        logger.error("Required libraries not installed")
+        raise HTTPException(status_code=500, detail="Required libraries not installed. Ensure google-generativeai and requests are installed.")
+    except Exception as e:
+        logger.error(f"Day 10 Conversational chat failed: {str(e)}")
+        # Clean up uploaded file on error
+        try:
+            if 'audio_path' in locals() and os.path.exists(audio_path):
+                os.remove(audio_path)
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=f"Conversational chat failed: {str(e)}")
+
+# Helper endpoint to get chat history
+@app.get("/agent/chat/{session_id}/history")
+async def get_session_history(session_id: str):
+    """Get chat history for a session"""
+    history = get_chat_history(session_id)
+    return {
+        "session_id": session_id,
+        "history": history,
+        "message_count": len(history)
+    }
+
+# Helper endpoint to clear chat history
+@app.delete("/agent/chat/{session_id}/history")
+async def clear_session_history(session_id: str):
+    """Clear chat history for a session"""
+    clear_chat_history(session_id)
+    return {
+        "session_id": session_id,
+        "message": "Chat history cleared"
+    }
 
 @app.post("/upload-audio")
 async def upload_audio(audio: UploadFile = File(...)):

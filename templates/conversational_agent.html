@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 10: Conversational AI Agent | 30 Days Voice Agents</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f7f7f8;
+            height: 100vh;
+            overflow: hidden;
+            color: #333;
+        }
+        
+        .chat-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            width: 280px;
+            background: #202123;
+            border-right: 1px solid #4d4d4f;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .sidebar-header {
+            padding: 18px 16px;
+            border-bottom: 1px solid #4d4d4f;
+        }
+        
+        .new-chat-btn {
+            width: 100%;
+            background: #10a37f;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .new-chat-btn:hover {
+            background: #1a7f64;
+            transform: translateY(-1px);
+        }
+        
+        .chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        
+        .chat-item {
+            padding: 12px 16px;
+            margin: 4px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #ececf1;
+            font-size: 14px;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-item:hover {
+            background: #2a2b32;
+        }
+        
+        .chat-item.active {
+            background: #343541;
+            border-color: #10a37f;
+        }
+        
+        .chat-title {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-right: 8px;
+        }
+        
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid #4d4d4f;
+            background: #1a1b1e;
+        }
+        
+        .navigation-links {
+            margin-bottom: 12px;
+        }
+        
+        .nav-link-small {
+            color: #10a37f;
+            text-decoration: none;
+            display: block;
+            padding: 8px 0;
+            font-size: 13px;
+        }
+        
+        .nav-link-small:hover {
+            color: #1a7f64;
+        }
+        
+        .user-info {
+            color: #ececf1;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* Main Chat Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+        
+        .chat-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-title-main {
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .chat-info {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        .session-badge {
+            background: #10a37f;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 8px;
+        }
+        
+        .message-limit-info {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-size: 11px;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        
+        .message {
+            margin-bottom: 24px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .message.user {
+            flex-direction: row-reverse;
+        }
+        
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        
+        .message.user .message-avatar {
+            background: #10a37f;
+            color: white;
+        }
+        
+        .message.assistant .message-avatar {
+            background: #6366f1;
+            color: white;
+        }
+        
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            line-height: 1.5;
+        }
+        
+        .message.user .message-content {
+            background: #10a37f;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.assistant .message-content {
+            background: #f3f4f6;
+            color: #374151;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        /* Voice Input Area */
+        .voice-input-area {
+            padding: 24px;
+            border-top: 1px solid #e5e7eb;
+            background: white;
+        }
+        
+        .recording-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .record-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(45deg, #10a37f, #059669);
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
+        }
+        
+        .record-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(16, 163, 127, 0.4);
+        }
+        
+        .record-button.recording {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .recording-status {
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        /* Progress Indicator */
+        .progress-indicator {
+            padding: 16px 24px;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            display: none;
+        }
+        
+        .progress-steps {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .progress-step {
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            background: #e5e7eb;
+            color: #6b7280;
+            transition: all 0.3s ease;
+        }
+        
+        .progress-step.active {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .progress-step.completed {
+            background: #10b981;
+            color: white;
+        }
+        
+        /* Message Limit Warning */
+        .limit-warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 24px;
+            display: none;
+        }
+        
+        .limit-warning.show {
+            display: block;
+        }
+        
+        .limit-warning-text {
+            color: #92400e;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .limit-warning-btn {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: absolute;
+                z-index: 1000;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                width: 100%;
+            }
+            
+            .chat-header {
+                padding: 12px 16px;
+            }
+            
+            .chat-messages {
+                padding: 16px;
+            }
+            
+            .voice-input-area {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" onclick="startNewChat()">
+                    <span>➕</span>
+                    New Conversation
+                </button>
+            </div>
+            
+            <div class="chat-history" id="chatHistory">
+                <div style="text-align: center; color: #6b7280; padding: 20px; font-size: 14px;">
+                    <div class="loading-dots" style="display: flex; justify-content: center; gap: 4px; margin-bottom: 8px;">
+                        <div class="loading-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #6b7280; animation: bounce 1.4s ease-in-out infinite;"></div>
+                        <div class="loading-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #6b7280; animation: bounce 1.4s ease-in-out infinite 0.16s;"></div>
+                        <div class="loading-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #6b7280; animation: bounce 1.4s ease-in-out infinite 0.32s;"></div>
+                    </div>
+                    <div style="margin-top: 8px;">Loading conversations...</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="navigation-links">
+                    <a href="/" class="nav-link-small">🏠 Home</a>
+                    <a href="/voice-pipeline" class="nav-link-small">🎙️ Voice Pipeline</a>
+                </div>
+                <div class="user-info">
+                    <span>🤖</span>
+                    <span>Conversational AI</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Chat Area -->
+        <div class="main-content">
+            <div class="chat-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button class="sidebar-toggle" onclick="toggleSidebar()" style="display: none; background: none; border: 1px solid #e5e7eb; padding: 8px 12px; border-radius: 6px; cursor: pointer;">☰</button>
+                    <div>
+                        <div class="chat-title-main" id="chatTitle">New Conversation</div>
+                        <div class="chat-info">
+                            <span class="session-badge" id="sessionBadge">Loading...</span>
+                            <span id="messageCount">0 messages</span>
+                            <span class="message-limit-info" id="limitInfo">15 remaining</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="clearCurrentChat()" style="background: none; border: 1px solid #e5e7eb; padding: 8px 16px; border-radius: 6px; cursor: pointer; color: #6b7280;">
+                        🗑️ Clear
+                    </button>
+                    <button onclick="testDisplay()" style="background: none; border: 1px solid #e5e7eb; padding: 8px 16px; border-radius: 6px; cursor: pointer; color: #6b7280;">
+                        🧪 Test
+                    </button>
+                </div>
+            </div>
+            
+            <div class="limit-warning" id="limitWarning">
+                <div class="limit-warning-text">You've reached the maximum number of messages (15) for this conversation.</div>
+                <button class="limit-warning-btn" onclick="startNewChat()">Start New Conversation</button>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-state-icon">🤖</div>
+                    <h3>Start Your Conversation</h3>
+                    <p>Click the microphone button below to begin talking with the AI. Your conversation history will be automatically saved in the sidebar.</p>
+                </div>
+            </div>
+            
+            <div class="progress-indicator" id="progressIndicator">
+                <div class="progress-steps">
+                    <div class="progress-step" id="step1">🎙️ Recording</div>
+                    <div class="progress-step" id="step2">📝 Transcribing</div>
+                    <div class="progress-step" id="step3">🧠 AI Thinking</div>
+                    <div class="progress-step" id="step4">🔊 Generating Voice</div>
+                </div>
+            </div>
+            
+            <div class="voice-input-area">
+                <div class="recording-section">
+                    <button id="recordButton" class="record-button" onclick="toggleRecording()">
+                        🎙️
+                    </button>
+                    <div class="recording-status" id="recordingStatus">
+                        Click to start talking
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let conversationHistory = [];
+        let currentAudio = null;
+        let messageCount = 0;
+        const maxMessages = 15;
+        
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing app');
+            generateSessionId();
+            console.log('Session ID generated:', currentSessionId);
+            loadConversationHistory();
+            console.log('Conversation history loaded');
+            updateMessageLimit();
+            console.log('Message limit updated');
+            
+            // Test display function
+            setTimeout(() => {
+                console.log('Testing displayConversation function');
+                displayConversation();
+            }, 1000);
+        });
+        
+        function generateSessionId() {
+            currentSessionId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            document.getElementById('sessionBadge').textContent = currentSessionId;
+            document.getElementById('chatTitle').textContent = 'New Conversation';
+        }
+        
+        function loadConversationHistory() {
+            const history = localStorage.getItem('chatHistory') || '[]';
+            const chats = JSON.parse(history);
+            const historyContainer = document.getElementById('chatHistory');
+            
+            if (chats.length === 0) {
+                historyContainer.innerHTML = `
+                    <div style="text-align: center; color: #6b7280; padding: 20px; font-size: 14px;">
+                        No conversations yet. Start your first chat!
+                    </div>
+                `;
+                return;
+            }
+            
+            historyContainer.innerHTML = '';
+            chats.slice(-10).reverse().forEach(chat => {
+                const chatItem = document.createElement('div');
+                chatItem.className = 'chat-item';
+                chatItem.onclick = () => loadChat(chat.sessionId);
+                
+                const title = chat.title || 'Conversation';
+                const messageCount = chat.messages ? chat.messages.length : 0;
+                
+                chatItem.innerHTML = `
+                    <div class="chat-title">${title}</div>
+                    <div style="font-size: 11px; color: #9ca3af;">${messageCount} msgs</div>
+                `;
+                
+                if (chat.sessionId === currentSessionId) {
+                    chatItem.classList.add('active');
+                }
+                
+                historyContainer.appendChild(chatItem);
+            });
+        }
+        
+        function startNewChat() {
+            if (messageCount >= maxMessages) {
+                // Force new chat when limit reached
+                generateSessionId();
+                conversationHistory = [];
+                messageCount = 0;
+                document.getElementById('chatMessages').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🤖</div>
+                        <h3>New Conversation Started</h3>
+                        <p>Your previous conversation reached the message limit. Start fresh below!</p>
+                    </div>
+                `;
+                document.getElementById('limitWarning').classList.remove('show');
+                updateMessageLimit();
+                return;
+            }
+            
+            // Regular new chat
+            generateSessionId();
+            conversationHistory = [];
+            messageCount = 0;
+            document.getElementById('chatMessages').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🤖</div>
+                    <h3>Start Your Conversation</h3>
+                    <p>Click the microphone button below to begin talking with the AI.</p>
+                </div>
+            `;
+            document.getElementById('limitWarning').classList.remove('show');
+            updateMessageLimit();
+            loadConversationHistory();
+        }
+        
+        function loadChat(sessionId) {
+            const history = localStorage.getItem('chatHistory') || '[]';
+            const chats = JSON.parse(history);
+            const chat = chats.find(c => c.sessionId === sessionId);
+            
+            if (chat) {
+                currentSessionId = sessionId;
+                conversationHistory = chat.messages || [];
+                messageCount = conversationHistory.length;
+                document.getElementById('sessionBadge').textContent = sessionId;
+                document.getElementById('chatTitle').textContent = chat.title || 'Conversation';
+                displayConversation();
+                updateMessageLimit();
+                loadConversationHistory(); // Refresh to show active state
+            }
+        }
+        
+        function updateMessageLimit() {
+            const remaining = maxMessages - messageCount;
+            const limitInfo = document.getElementById('limitInfo');
+            const limitWarning = document.getElementById('limitWarning');
+            
+            limitInfo.textContent = `${remaining} remaining`;
+            
+            if (remaining <= 3 && remaining > 0) {
+                limitInfo.style.background = '#f59e0b';
+                limitInfo.style.color = 'white';
+            } else if (remaining <= 0) {
+                limitInfo.style.background = '#ef4444';
+                limitInfo.style.color = 'white';
+                limitInfo.textContent = 'Limit reached';
+                limitWarning.classList.add('show');
+            } else {
+                limitInfo.style.background = '#fef3c7';
+                limitInfo.style.color = '#92400e';
+            }
+            
+            document.getElementById('messageCount').textContent = `${messageCount} messages`;
+        }
+        
+        function displayConversation() {
+            console.log('displayConversation called, conversationHistory:', conversationHistory);
+            const container = document.getElementById('chatMessages');
+            console.log('Chat container found:', container);
+            
+            if (conversationHistory.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🤖</div>
+                        <h3>Start Your Conversation</h3>
+                        <p>Click the microphone button below to begin talking with the AI.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '';
+            conversationHistory.forEach(msg => {
+                console.log('Adding message to display:', msg);
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${msg.role}`;
+                messageDiv.innerHTML = `
+                    <div class="message-avatar">${msg.role === 'user' ? '👤' : '🤖'}</div>
+                    <div class="message-content">${msg.content}</div>
+                `;
+                container.appendChild(messageDiv);
+            });
+            
+            container.scrollTop = container.scrollHeight;
+            console.log('Conversation display completed');
+        }
+        
+        function saveConversation() {
+            const history = localStorage.getItem('chatHistory') || '[]';
+            const chats = JSON.parse(history);
+            
+            const existingIndex = chats.findIndex(c => c.sessionId === currentSessionId);
+            const title = conversationHistory.length > 0 ? 
+                conversationHistory[0].content.substring(0, 30) + '...' : 
+                'New Conversation';
+            
+            const chatData = {
+                sessionId: currentSessionId,
+                title: title,
+                messages: conversationHistory,
+                timestamp: new Date().toISOString()
+            };
+            
+            if (existingIndex >= 0) {
+                chats[existingIndex] = chatData;
+            } else {
+                chats.push(chatData);
+            }
+            
+            // Keep only last 20 conversations
+            if (chats.length > 20) {
+                chats.splice(0, chats.length - 20);
+            }
+            
+            localStorage.setItem('chatHistory', JSON.stringify(chats));
+            loadConversationHistory();
+        }
+        
+        function clearCurrentChat() {
+            if (confirm('Are you sure you want to clear this conversation?')) {
+                conversationHistory = [];
+                messageCount = 0;
+                displayConversation();
+                updateMessageLimit();
+                document.getElementById('limitWarning').classList.remove('show');
+                
+                // Remove from localStorage
+                const history = localStorage.getItem('chatHistory') || '[]';
+                const chats = JSON.parse(history);
+                const filteredChats = chats.filter(c => c.sessionId !== currentSessionId);
+                localStorage.setItem('chatHistory', JSON.stringify(filteredChats));
+                loadConversationHistory();
+            }
+        }
+        
+        async function toggleRecording() {
+            console.log('toggleRecording called, messageCount:', messageCount, 'maxMessages:', maxMessages);
+            
+            if (messageCount >= maxMessages) {
+                alert('Conversation limit reached! Please start a new conversation.');
+                return;
+            }
+            
+            if (isRecording) {
+                console.log('Stopping recording');
+                stopRecording();
+            } else {
+                console.log('Starting recording');
+                startRecording();
+            }
+        }
+        
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = handleRecordingComplete;
+                
+                mediaRecorder.start();
+                isRecording = true;
+                
+                document.getElementById('recordButton').classList.add('recording');
+                document.getElementById('recordingStatus').textContent = '🔴 Recording... Click to stop';
+                
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                alert('Could not access microphone. Please check permissions.');
+            }
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                
+                document.getElementById('recordButton').classList.remove('recording');
+                document.getElementById('recordingStatus').textContent = 'Processing...';
+            }
+        }
+        
+        async function handleRecordingComplete() {
+            console.log('handleRecordingComplete called');
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            console.log('Audio blob created, size:', audioBlob.size);
+            
+            // Show progress and start with recording step
+            showProgress();
+            updateProgress(1, 'active');
+            
+            try {
+                const formData = new FormData();
+                formData.append('audio_file', audioBlob, 'recording.wav');
+                formData.append('session_id', currentSessionId);
+                
+                // Small delay to show recording step
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Move to transcribing step
+                updateProgress(1, 'completed');
+                updateProgress(2, 'active');
+                console.log('Starting API request...');
+                
+                const response = await fetch(`/agent/chat/${currentSessionId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                // Move to AI thinking step
+                updateProgress(2, 'completed');
+                updateProgress(3, 'active');
+                console.log('Transcription completed, AI processing...');
+                
+                const result = await response.json();
+                console.log('API Response:', result);
+                
+                // Move to voice generation step
+                updateProgress(3, 'completed');
+                updateProgress(4, 'active');
+                console.log('AI processing completed, generating voice...');
+                
+                if (result.transcribed_text && result.llm_response) {
+                    console.log('Adding to conversation history:', {
+                        user: result.transcribed_text,
+                        assistant: result.llm_response
+                    });
+                    
+                    // Add to conversation history
+                    conversationHistory.push({
+                        role: 'user',
+                        content: result.transcribed_text
+                    });
+                    conversationHistory.push({
+                        role: 'assistant',
+                        content: result.llm_response
+                    });
+                    
+                    console.log('Conversation history after update:', conversationHistory);
+                    
+                    messageCount += 2;
+                    displayConversation();
+                    saveConversation();
+                    updateMessageLimit();
+                    
+                    // Small delay before completing voice generation
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    
+                    // Complete voice generation step
+                    updateProgress(4, 'completed');
+                    console.log('Voice generation completed');
+                    
+                    // Play AI response automatically and add permanent replay button
+                    console.log('Checking for audio URL in response:', result.audio_url);
+                    if (result.audio_url) {
+                        console.log('Audio URL found, attempting aggressive autoplay:', result.audio_url);
+                        
+                        // Always add a permanent replay button first
+                        addPermanentReplayButton(result.audio_url);
+                        
+                        // Create multiple audio objects and try different approaches
+                        if (currentAudio) {
+                            currentAudio.pause();
+                        }
+                        
+                        // Primary audio object
+                        currentAudio = new Audio(result.audio_url);
+                        
+                        // Set audio properties for better autoplay compatibility
+                        currentAudio.preload = 'auto';
+                        currentAudio.autoplay = true;
+                        currentAudio.volume = 1.0;
+                        
+                        console.log('Audio object created with autoplay properties');
+                        
+                        // Handle audio events
+                        currentAudio.onloadeddata = () => {
+                            console.log('Audio loaded successfully, attempting immediate play');
+                            // Try to play as soon as data is loaded
+                            currentAudio.play().catch(e => console.log('Immediate play failed:', e));
+                        };
+                        
+                        currentAudio.oncanplaythrough = () => {
+                            console.log('Audio can play through, attempting play');
+                            // Try again when fully loaded
+                            currentAudio.play().catch(e => console.log('CanPlayThrough play failed:', e));
+                        };
+                        
+                        currentAudio.onended = () => {
+                            console.log('Audio playback finished');
+                        };
+                        
+                        currentAudio.onerror = (e) => {
+                            console.error('Audio playback error:', e);
+                        };
+                        
+                        // Multiple immediate play attempts with different timing
+                        console.log('Starting multiple autoplay attempts...');
+                        
+                        // Attempt 1: Immediate
+                        currentAudio.play()
+                            .then(() => {
+                                console.log('✅ Autoplay attempt 1 SUCCESS');
+                            })
+                            .catch(e => {
+                                console.log('❌ Autoplay attempt 1 failed:', e);
+                                
+                                // Attempt 2: After small delay
+                                setTimeout(() => {
+                                    currentAudio.play()
+                                        .then(() => {
+                                            console.log('✅ Autoplay attempt 2 SUCCESS (delayed)');
+                                        })
+                                        .catch(e => {
+                                            console.log('❌ Autoplay attempt 2 failed:', e);
+                                            
+                                            // Attempt 3: Force play with user gesture simulation
+                                            setTimeout(() => {
+                                                console.log('Attempting force play...');
+                                                currentAudio.muted = false;
+                                                currentAudio.volume = 1.0;
+                                                currentAudio.currentTime = 0;
+                                                currentAudio.play()
+                                                    .then(() => {
+                                                        console.log('✅ Autoplay attempt 3 SUCCESS (forced)');
+                                                    })
+                                                    .catch(e => {
+                                                        console.log('❌ All autoplay attempts failed:', e);
+                                                        // Flash the replay button to get user attention
+                                                        flashReplayButton();
+                                                    });
+                                            }, 100);
+                                        });
+                                }, 200);
+                            });
+                        
+                        // Additional aggressive attempt after page interaction
+                        document.addEventListener('click', function autoplayOnClick() {
+                            console.log('Page clicked, attempting autoplay...');
+                            if (currentAudio && currentAudio.paused) {
+                                currentAudio.play()
+                                    .then(() => {
+                                        console.log('✅ Autoplay after click SUCCESS');
+                                        document.removeEventListener('click', autoplayOnClick);
+                                    })
+                                    .catch(e => {
+                                        console.log('❌ Autoplay after click failed:', e);
+                                    });
+                            }
+                        }, { once: true });
+                        
+                    } else {
+                        console.log('No audio URL found in response');
+                    }
+                } else {
+                    console.error('Missing transcribed_text or llm_response in result');
+                }
+                
+            } catch (error) {
+                console.error('Error processing conversation:', error);
+                alert('Error processing your message. Please try again.');
+                // Reset progress on error
+                hideProgress();
+            } finally {
+                // Hide progress after a delay
+                setTimeout(() => {
+                    hideProgress();
+                }, 1000);
+                document.getElementById('recordingStatus').textContent = 'Click to start talking';
+            }
+        }
+        
+        function addPermanentReplayButton(audioUrl) {
+            console.log('Adding permanent replay button for:', audioUrl);
+            
+            // Create a container for the audio controls
+            const audioContainer = document.createElement('div');
+            audioContainer.style.cssText = 'margin: 12px 0; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;';
+            audioContainer.id = 'audio-container-' + Date.now(); // Add unique ID for flashing
+            
+            // Create the replay button
+            const replayButton = document.createElement('button');
+            replayButton.textContent = '🔊 Play AI Response';
+            replayButton.style.cssText = 'padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; font-size: 14px;';
+            replayButton.id = 'replay-btn-' + Date.now(); // Add unique ID for flashing
+            
+            // Create a status indicator
+            const statusIndicator = document.createElement('span');
+            statusIndicator.textContent = 'Ready to play';
+            statusIndicator.style.cssText = 'font-size: 12px; color: #6b7280; margin-left: 8px;';
+            
+            // Create a new audio object for this specific response
+            const replayAudio = new Audio(audioUrl);
+            
+            // Handle audio events
+            replayAudio.onloadstart = () => {
+                statusIndicator.textContent = 'Loading...';
+                statusIndicator.style.color = '#3b82f6';
+            };
+            
+            replayAudio.oncanplaythrough = () => {
+                statusIndicator.textContent = 'Ready to play';
+                statusIndicator.style.color = '#10b981';
+            };
+            
+            replayAudio.onplay = () => {
+                replayButton.textContent = '⏸️ Pause';
+                replayButton.style.background = '#f59e0b';
+                statusIndicator.textContent = 'Playing...';
+                statusIndicator.style.color = '#10b981';
+            };
+            
+            replayAudio.onpause = () => {
+                replayButton.textContent = '🔊 Play AI Response';
+                replayButton.style.background = '#10b981';
+                statusIndicator.textContent = 'Paused';
+                statusIndicator.style.color = '#6b7280';
+            };
+            
+            replayAudio.onended = () => {
+                replayButton.textContent = '🔄 Replay';
+                replayButton.style.background = '#6366f1';
+                statusIndicator.textContent = 'Finished - Click to replay';
+                statusIndicator.style.color = '#6366f1';
+            };
+            
+            replayAudio.onerror = () => {
+                replayButton.textContent = '❌ Audio Error';
+                replayButton.style.background = '#ef4444';
+                replayButton.disabled = true;
+                statusIndicator.textContent = 'Failed to load audio';
+                statusIndicator.style.color = '#ef4444';
+            };
+            
+            // Button click handler
+            replayButton.onclick = () => {
+                console.log('Replay button clicked, audio paused:', replayAudio.paused);
+                
+                if (replayAudio.paused) {
+                    // Reset to beginning if audio has ended
+                    if (replayAudio.ended) {
+                        replayAudio.currentTime = 0;
+                    }
+                    
+                    replayAudio.play()
+                        .then(() => {
+                            console.log('Replay audio started successfully');
+                        })
+                        .catch(e => {
+                            console.error('Replay audio failed:', e);
+                            replayButton.textContent = '❌ Play Failed';
+                            replayButton.style.background = '#ef4444';
+                            statusIndicator.textContent = 'Playback failed';
+                            statusIndicator.style.color = '#ef4444';
+                        });
+                } else {
+                    replayAudio.pause();
+                }
+            };
+            
+            // Assemble the container
+            audioContainer.appendChild(replayButton);
+            audioContainer.appendChild(statusIndicator);
+            
+            // Add to the chat area
+            const chatContainer = document.getElementById('chatMessages');
+            chatContainer.appendChild(audioContainer);
+            
+            // Scroll to show the new button
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Store reference for flashing
+            window.latestReplayButton = replayButton;
+            window.latestAudioContainer = audioContainer;
+            
+            console.log('Permanent replay button added successfully');
+        }
+        
+        function flashReplayButton() {
+            console.log('Flashing replay button to get user attention');
+            if (window.latestReplayButton && window.latestAudioContainer) {
+                const button = window.latestReplayButton;
+                const container = window.latestAudioContainer;
+                
+                // Flash animation
+                let flashCount = 0;
+                const flashInterval = setInterval(() => {
+                    if (flashCount < 6) { // Flash 3 times
+                        if (flashCount % 2 === 0) {
+                            button.style.background = '#ef4444';
+                            button.style.transform = 'scale(1.1)';
+                            container.style.background = '#fef2f2';
+                            container.style.borderColor = '#ef4444';
+                        } else {
+                            button.style.background = '#10b981';
+                            button.style.transform = 'scale(1)';
+                            container.style.background = '#f8fafc';
+                            container.style.borderColor = '#e2e8f0';
+                        }
+                        flashCount++;
+                    } else {
+                        clearInterval(flashInterval);
+                        // Reset to normal
+                        button.style.background = '#10b981';
+                        button.style.transform = 'scale(1)';
+                        container.style.background = '#f8fafc';
+                        container.style.borderColor = '#e2e8f0';
+                    }
+                }, 300);
+            }
+        }
+        
+        function showProgress() {
+            document.getElementById('progressIndicator').style.display = 'block';
+            resetProgress();
+        }
+        
+        function hideProgress() {
+            document.getElementById('progressIndicator').style.display = 'none';
+        }
+        
+        function resetProgress() {
+            for (let i = 1; i <= 4; i++) {
+                const step = document.getElementById(`step${i}`);
+                step.classList.remove('active', 'completed');
+            }
+        }
+        
+        function updateProgress(stepNumber, status) {
+            const step = document.getElementById(`step${stepNumber}`);
+            step.classList.remove('active', 'completed');
+            if (status) {
+                step.classList.add(status);
+            }
+        }
+        
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('open');
+        }
+        
+        // Mobile responsiveness
+        if (window.innerWidth <= 768) {
+            document.querySelector('.sidebar-toggle').style.display = 'block';
+        }
+        
+        function testDisplay() {
+            console.log('Test button clicked');
+            console.log('Current conversationHistory:', conversationHistory);
+            console.log('Current messageCount:', messageCount);
+            
+            // Add a test message
+            conversationHistory.push({
+                role: 'user',
+                content: 'Test user message'
+            });
+            conversationHistory.push({
+                role: 'assistant',
+                content: 'Test AI response - this is a sample response to verify the display is working.'
+            });
+            
+            console.log('Added test messages, calling displayConversation');
+            displayConversation();
+            
+            // Test audio playback with a simple beep
+            console.log('Testing audio playback...');
+            const testAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuW2e/LdCUELIHQ8tiJOQcZZ7zl559NEApPqOPxtmMcBQeA5');
+            testAudio.play()
+                .then(() => console.log('Test audio played successfully'))
+                .catch(e => console.error('Test audio failed:', e));
+        }
+        
+        // Animation for loading dots
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes bounce {
+                0%, 80%, 100% { transform: translateY(0); }
+                40% { transform: translateY(-10px); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
