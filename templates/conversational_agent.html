@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Day 10: Conversational AI Agent | 30 Days Voice Agents</title>
+    <title>Day 11: Enhanced Conversational AI with Error Handling | 30 Days Voice Agents</title>
     <style>
         * {
             margin: 0;
@@ -357,7 +357,93 @@
             font-size: 12px;
         }
         
-        /* Responsive Design */
+        /* Error handling styles */
+        .error-indicator {
+            padding: 12px 16px;
+            margin: 16px 24px;
+            border-radius: 8px;
+            display: none;
+            border-left: 4px solid #ef4444;
+            background: #fef2f2;
+        }
+        
+        .error-indicator.show {
+            display: block;
+        }
+        
+        .error-indicator.warning {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+        
+        .error-indicator.info {
+            border-left-color: #3b82f6;
+            background: #eff6ff;
+        }
+        
+        .error-text {
+            color: #dc2626;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .error-indicator.warning .error-text {
+            color: #d97706;
+        }
+        
+        .error-indicator.info .error-text {
+            color: #2563eb;
+        }
+        
+        .error-details {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        .retry-button {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        
+        .retry-button:hover {
+            background: #dc2626;
+        }
+        
+        /* Enhanced progress indicator for error states */
+        .progress-step.error {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .progress-step.warning {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        /* Fallback audio indicator */
+        .fallback-audio-indicator {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-size: 12px;
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .fallback-audio-indicator .icon {
+            color: #f59e0b;
+        }
         @media (max-width: 768px) {
             .sidebar {
                 width: 100%;
@@ -444,12 +530,21 @@
                     <button onclick="testDisplay()" style="background: none; border: 1px solid #e5e7eb; padding: 8px 16px; border-radius: 6px; cursor: pointer; color: #6b7280;">
                         🧪 Test
                     </button>
+                    <button onclick="testErrorHandling()" style="background: none; border: 1px solid #f59e0b; padding: 8px 16px; border-radius: 6px; cursor: pointer; color: #f59e0b;">
+                        ⚠️ Test Errors
+                    </button>
                 </div>
             </div>
             
             <div class="limit-warning" id="limitWarning">
                 <div class="limit-warning-text">You've reached the maximum number of messages (15) for this conversation.</div>
                 <button class="limit-warning-btn" onclick="startNewChat()">Start New Conversation</button>
+            </div>
+            
+            <div class="error-indicator" id="errorIndicator">
+                <div class="error-text" id="errorText">An error occurred</div>
+                <div class="error-details" id="errorDetails">Error details will appear here</div>
+                <button class="retry-button" id="retryButton" onclick="retryLastAction()" style="display: none;">Retry</button>
             </div>
             
             <div class="chat-messages" id="chatMessages">
@@ -491,8 +586,122 @@
         let currentAudio = null;
         let messageCount = 0;
         const maxMessages = 15;
+        let lastFailedAction = null; // For retry functionality
+        let errorRetryCount = 0;
+        const maxRetries = 3;
         
-        // Initialize the app
+        // Enhanced error handling functions
+        function showError(message, details = '', type = 'error', showRetry = false) {
+            console.error('Error:', message, details);
+            
+            const errorIndicator = document.getElementById('errorIndicator');
+            const errorText = document.getElementById('errorText');
+            const errorDetails = document.getElementById('errorDetails');
+            const retryButton = document.getElementById('retryButton');
+            
+            errorText.textContent = message;
+            errorDetails.textContent = details;
+            
+            // Set error type styling
+            errorIndicator.className = `error-indicator show ${type}`;
+            
+            // Show/hide retry button
+            retryButton.style.display = showRetry ? 'block' : 'none';
+            
+            // Auto-hide after 10 seconds for non-critical errors
+            if (type !== 'error') {
+                setTimeout(() => {
+                    hideError();
+                }, 10000);
+            }
+        }
+        
+        function hideError() {
+            const errorIndicator = document.getElementById('errorIndicator');
+            errorIndicator.classList.remove('show');
+        }
+        
+        function retryLastAction() {
+            if (lastFailedAction && errorRetryCount < maxRetries) {
+                errorRetryCount++;
+                console.log(`Retrying action (attempt ${errorRetryCount}/${maxRetries})`);
+                hideError();
+                lastFailedAction();
+            } else {
+                showError(
+                    'Maximum retry attempts reached',
+                    'Please try recording a new message',
+                    'warning'
+                );
+            }
+        }
+        
+        function handleApiError(error, context = '') {
+            console.error(`API Error in ${context}:`, error);
+            
+            let errorMessage = 'Something went wrong';
+            let errorDetails = '';
+            let showRetryButton = true;
+            
+            if (error.message) {
+                if (error.message.includes('network') || error.message.includes('fetch')) {
+                    errorMessage = 'Network connection issue';
+                    errorDetails = 'Please check your internet connection and try again';
+                } else if (error.message.includes('timeout')) {
+                    errorMessage = 'Request timed out';
+                    errorDetails = 'The server is taking too long to respond. Please try with a shorter message';
+                } else if (error.message.includes('401') || error.message.includes('403')) {
+                    errorMessage = 'Authentication error';
+                    errorDetails = 'The service is temporarily unavailable. Please try again later';
+                    showRetryButton = false;
+                } else if (error.message.includes('429')) {
+                    errorMessage = 'Too many requests';
+                    errorDetails = 'Please wait a moment before trying again';
+                } else if (error.message.includes('500')) {
+                    errorMessage = 'Server error';
+                    errorDetails = 'The server encountered an error. This has been logged for investigation';
+                } else {
+                    errorMessage = 'Unexpected error occurred';
+                    errorDetails = error.message.substring(0, 100) + (error.message.length > 100 ? '...' : '');
+                }
+            }
+            
+            showError(errorMessage, errorDetails, 'error', showRetryButton);
+            return false;
+        }
+        
+        function processApiResponse(result, context = '') {
+            if (!result) {
+                handleApiError(new Error('Empty response received'), context);
+                return false;
+            }
+            
+            // Check for fallback indicators
+            if (result.is_fallback || result.error_context || result.pipeline_status === 'partial_fallback') {
+                let warningMessage = 'Using backup systems';
+                let warningDetails = '';
+                
+                if (result.error_context) {
+                    warningDetails = `Some services experienced issues: ${result.error_context}`;
+                } else {
+                    warningDetails = 'The system automatically switched to backup services to ensure continued operation';
+                }
+                
+                showError(warningMessage, warningDetails, 'warning', false);
+            }
+            
+            // Check for error simulation
+            if (result.error_simulation) {
+                showError(
+                    'Error simulation active',
+                    `Testing ${result.simulated_error} error handling - fallback systems engaged`,
+                    'info',
+                    false
+                );
+            }
+            
+            return true;
+        }
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded, initializing app');
             generateSessionId();
@@ -762,9 +971,14 @@
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
             console.log('Audio blob created, size:', audioBlob.size);
             
+            // Store this action for potential retry
+            lastFailedAction = () => handleRecordingComplete();
+            errorRetryCount = 0;
+            
             // Show progress and start with recording step
             showProgress();
             updateProgress(1, 'active');
+            hideError(); // Clear any previous errors
             
             try {
                 const formData = new FormData();
@@ -777,15 +991,30 @@
                 // Move to transcribing step
                 updateProgress(1, 'completed');
                 updateProgress(2, 'active');
-                console.log('Starting API request...');
+                console.log('Starting enhanced API request with error handling...');
+                
+                // Enhanced fetch with timeout and retry logic
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
                 
                 const response = await fetch(`/agent/chat/${currentSessionId}`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
                 
+                clearTimeout(timeoutId);
+                
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    if (response.status === 429) {
+                        throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+                    } else if (response.status >= 500) {
+                        throw new Error(`Server error (${response.status}). The service is experiencing issues.`);
+                    } else if (response.status === 401 || response.status === 403) {
+                        throw new Error('Authentication failed. The service is temporarily unavailable.');
+                    } else {
+                        throw new Error(`Request failed with status ${response.status}`);
+                    }
                 }
                 
                 // Move to AI thinking step
@@ -794,7 +1023,12 @@
                 console.log('Transcription completed, AI processing...');
                 
                 const result = await response.json();
-                console.log('API Response:', result);
+                console.log('Enhanced API Response:', result);
+                
+                // Process the response and check for errors/fallbacks
+                if (!processApiResponse(result, 'conversation processing')) {
+                    return;
+                }
                 
                 // Move to voice generation step
                 updateProgress(3, 'completed');
@@ -831,115 +1065,57 @@
                     updateProgress(4, 'completed');
                     console.log('Voice generation completed');
                     
-                    // Play AI response automatically and add permanent replay button
+                    // Enhanced audio handling with fallback detection
                     console.log('Checking for audio URL in response:', result.audio_url);
                     if (result.audio_url) {
-                        console.log('Audio URL found, attempting aggressive autoplay:', result.audio_url);
+                        console.log('Audio URL found, attempting enhanced autoplay:', result.audio_url);
+                        
+                        // Check if this is fallback audio
+                        const isFallbackAudio = result.voice && result.voice.includes('fallback');
                         
                         // Always add a permanent replay button first
-                        addPermanentReplayButton(result.audio_url);
+                        addPermanentReplayButton(result.audio_url, isFallbackAudio);
                         
-                        // Create multiple audio objects and try different approaches
-                        if (currentAudio) {
-                            currentAudio.pause();
-                        }
-                        
-                        // Primary audio object
-                        currentAudio = new Audio(result.audio_url);
-                        
-                        // Set audio properties for better autoplay compatibility
-                        currentAudio.preload = 'auto';
-                        currentAudio.autoplay = true;
-                        currentAudio.volume = 1.0;
-                        
-                        console.log('Audio object created with autoplay properties');
-                        
-                        // Handle audio events
-                        currentAudio.onloadeddata = () => {
-                            console.log('Audio loaded successfully, attempting immediate play');
-                            // Try to play as soon as data is loaded
-                            currentAudio.play().catch(e => console.log('Immediate play failed:', e));
-                        };
-                        
-                        currentAudio.oncanplaythrough = () => {
-                            console.log('Audio can play through, attempting play');
-                            // Try again when fully loaded
-                            currentAudio.play().catch(e => console.log('CanPlayThrough play failed:', e));
-                        };
-                        
-                        currentAudio.onended = () => {
-                            console.log('Audio playback finished');
-                        };
-                        
-                        currentAudio.onerror = (e) => {
-                            console.error('Audio playback error:', e);
-                        };
-                        
-                        // Multiple immediate play attempts with different timing
-                        console.log('Starting multiple autoplay attempts...');
-                        
-                        // Attempt 1: Immediate
-                        currentAudio.play()
-                            .then(() => {
-                                console.log('✅ Autoplay attempt 1 SUCCESS');
-                            })
-                            .catch(e => {
-                                console.log('❌ Autoplay attempt 1 failed:', e);
-                                
-                                // Attempt 2: After small delay
-                                setTimeout(() => {
-                                    currentAudio.play()
-                                        .then(() => {
-                                            console.log('✅ Autoplay attempt 2 SUCCESS (delayed)');
-                                        })
-                                        .catch(e => {
-                                            console.log('❌ Autoplay attempt 2 failed:', e);
-                                            
-                                            // Attempt 3: Force play with user gesture simulation
-                                            setTimeout(() => {
-                                                console.log('Attempting force play...');
-                                                currentAudio.muted = false;
-                                                currentAudio.volume = 1.0;
-                                                currentAudio.currentTime = 0;
-                                                currentAudio.play()
-                                                    .then(() => {
-                                                        console.log('✅ Autoplay attempt 3 SUCCESS (forced)');
-                                                    })
-                                                    .catch(e => {
-                                                        console.log('❌ All autoplay attempts failed:', e);
-                                                        // Flash the replay button to get user attention
-                                                        flashReplayButton();
-                                                    });
-                                            }, 100);
-                                        });
-                                }, 200);
-                            });
-                        
-                        // Additional aggressive attempt after page interaction
-                        document.addEventListener('click', function autoplayOnClick() {
-                            console.log('Page clicked, attempting autoplay...');
-                            if (currentAudio && currentAudio.paused) {
-                                currentAudio.play()
-                                    .then(() => {
-                                        console.log('✅ Autoplay after click SUCCESS');
-                                        document.removeEventListener('click', autoplayOnClick);
-                                    })
-                                    .catch(e => {
-                                        console.log('❌ Autoplay after click failed:', e);
-                                    });
-                            }
-                        }, { once: true });
+                        // Enhanced audio playback with error handling
+                        await playAudioWithFallback(result.audio_url, isFallbackAudio);
                         
                     } else {
                         console.log('No audio URL found in response');
+                        showError(
+                            'Audio generation failed', 
+                            'Voice synthesis is temporarily unavailable', 
+                            'warning'
+                        );
                     }
                 } else {
                     console.error('Missing transcribed_text or llm_response in result');
+                    showError(
+                        'Incomplete response', 
+                        'The server returned an incomplete response. Please try again.', 
+                        'error', 
+                        true
+                    );
                 }
+                
+                // Reset retry count on success
+                errorRetryCount = 0;
+                lastFailedAction = null;
                 
             } catch (error) {
                 console.error('Error processing conversation:', error);
-                alert('Error processing your message. Please try again.');
+                
+                // Enhanced error handling based on error type
+                if (error.name === 'AbortError') {
+                    updateProgress(2, 'error');
+                    handleApiError(new Error('Request timed out. Please try with a shorter message.'), 'conversation timeout');
+                } else if (error.message.includes('fetch')) {
+                    updateProgress(2, 'error');
+                    handleApiError(new Error('Network connection failed. Please check your internet connection.'), 'network error');
+                } else {
+                    updateProgress(2, 'error');
+                    handleApiError(error, 'conversation processing');
+                }
+                
                 // Reset progress on error
                 hideProgress();
             } finally {
@@ -951,13 +1127,137 @@
             }
         }
         
-        function addPermanentReplayButton(audioUrl) {
-            console.log('Adding permanent replay button for:', audioUrl);
+        async function playAudioWithFallback(audioUrl, isFallbackAudio = false) {
+            try {
+                // Create multiple audio objects and try different approaches
+                if (currentAudio) {
+                    currentAudio.pause();
+                }
+                
+                // Primary audio object
+                currentAudio = new Audio(audioUrl);
+                
+                // Set audio properties for better autoplay compatibility
+                currentAudio.preload = 'auto';
+                currentAudio.autoplay = true;
+                currentAudio.volume = 1.0;
+                
+                console.log('Enhanced audio object created with fallback handling');
+                
+                // Enhanced audio event handlers
+                currentAudio.onloadeddata = () => {
+                    console.log('Audio loaded successfully, attempting play');
+                    currentAudio.play().catch(e => console.log('Initial play failed:', e));
+                };
+                
+                currentAudio.oncanplaythrough = () => {
+                    console.log('Audio can play through, attempting play');
+                    currentAudio.play().catch(e => console.log('CanPlayThrough play failed:', e));
+                };
+                
+                currentAudio.onended = () => {
+                    console.log('Audio playback finished');
+                };
+                
+                currentAudio.onerror = (e) => {
+                    console.error('Audio playback error:', e);
+                    if (!isFallbackAudio) {
+                        showError(
+                            'Audio playback failed',
+                            'There was an issue playing the voice response. You can still read the text response above.',
+                            'warning'
+                        );
+                    }
+                };
+                
+                // Multiple enhanced play attempts with different timing
+                console.log('Starting enhanced autoplay attempts...');
+                
+                // Attempt 1: Immediate
+                currentAudio.play()
+                    .then(() => {
+                        console.log('✅ Enhanced autoplay attempt 1 SUCCESS');
+                    })
+                    .catch(e => {
+                        console.log('❌ Enhanced autoplay attempt 1 failed:', e);
+                        
+                        // Attempt 2: After small delay
+                        setTimeout(() => {
+                            currentAudio.play()
+                                .then(() => {
+                                    console.log('✅ Enhanced autoplay attempt 2 SUCCESS (delayed)');
+                                })
+                                .catch(e => {
+                                    console.log('❌ Enhanced autoplay attempt 2 failed:', e);
+                                    
+                                    // Attempt 3: Force play with user gesture simulation
+                                    setTimeout(() => {
+                                        console.log('Attempting enhanced force play...');
+                                        currentAudio.muted = false;
+                                        currentAudio.volume = 1.0;
+                                        currentAudio.currentTime = 0;
+                                        currentAudio.play()
+                                            .then(() => {
+                                                console.log('✅ Enhanced autoplay attempt 3 SUCCESS (forced)');
+                                            })
+                                            .catch(e => {
+                                                console.log('❌ All enhanced autoplay attempts failed:', e);
+                                                // Flash the replay button to get user attention
+                                                flashReplayButton();
+                                                
+                                                if (!isFallbackAudio) {
+                                                    showError(
+                                                        'Click to play audio',
+                                                        'Automatic audio playback was blocked. Please click the play button below.',
+                                                        'info'
+                                                    );
+                                                }
+                                            });
+                                    }, 100);
+                                });
+                        }, 200);
+                    });
+                
+                // Additional aggressive attempt after page interaction
+                document.addEventListener('click', function autoplayOnClick() {
+                    console.log('Page clicked, attempting enhanced autoplay...');
+                    if (currentAudio && currentAudio.paused) {
+                        currentAudio.play()
+                            .then(() => {
+                                console.log('✅ Enhanced autoplay after click SUCCESS');
+                                document.removeEventListener('click', autoplayOnClick);
+                            })
+                            .catch(e => {
+                                console.log('❌ Enhanced autoplay after click failed:', e);
+                            });
+                    }
+                }, { once: true });
+                
+            } catch (error) {
+                console.error('Enhanced audio playback setup failed:', error);
+                showError(
+                    'Audio setup failed',
+                    'There was an issue setting up audio playback. The text response is still available above.',
+                    'warning'
+                );
+            }
+        }
+        
+        function addPermanentReplayButton(audioUrl, isFallbackAudio = false) {
+            console.log('Adding enhanced permanent replay button for:', audioUrl);
             
             // Create a container for the audio controls
             const audioContainer = document.createElement('div');
             audioContainer.style.cssText = 'margin: 12px 0; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;';
             audioContainer.id = 'audio-container-' + Date.now(); // Add unique ID for flashing
+            
+            // Add fallback indicator if needed
+            if (isFallbackAudio) {
+                const fallbackIndicator = document.createElement('div');
+                fallbackIndicator.className = 'fallback-audio-indicator';
+                fallbackIndicator.innerHTML = '<span class="icon">⚠️</span> Using backup audio system';
+                audioContainer.appendChild(fallbackIndicator);
+            }
             
             // Create the replay button
             const replayButton = document.createElement('button');
@@ -973,7 +1273,7 @@
             // Create a new audio object for this specific response
             const replayAudio = new Audio(audioUrl);
             
-            // Handle audio events
+            // Enhanced audio event handlers
             replayAudio.onloadstart = () => {
                 statusIndicator.textContent = 'Loading...';
                 statusIndicator.style.color = '#3b82f6';
@@ -1011,31 +1311,54 @@
                 replayButton.disabled = true;
                 statusIndicator.textContent = 'Failed to load audio';
                 statusIndicator.style.color = '#ef4444';
+                
+                if (!isFallbackAudio) {
+                    showError(
+                        'Audio playback error',
+                        'This audio file could not be played. This may be due to network issues or audio format problems.',
+                        'warning'
+                    );
+                }
             };
             
-            // Button click handler
+            // Enhanced button click handler
             replayButton.onclick = () => {
-                console.log('Replay button clicked, audio paused:', replayAudio.paused);
+                console.log('Enhanced replay button clicked, audio paused:', replayAudio.paused);
                 
-                if (replayAudio.paused) {
-                    // Reset to beginning if audio has ended
-                    if (replayAudio.ended) {
-                        replayAudio.currentTime = 0;
+                try {
+                    if (replayAudio.paused) {
+                        // Reset to beginning if audio has ended
+                        if (replayAudio.ended) {
+                            replayAudio.currentTime = 0;
+                        }
+                        
+                        replayAudio.play()
+                            .then(() => {
+                                console.log('Enhanced replay audio started successfully');
+                            })
+                            .catch(e => {
+                                console.error('Enhanced replay audio failed:', e);
+                                replayButton.textContent = '❌ Play Failed';
+                                replayButton.style.background = '#ef4444';
+                                statusIndicator.textContent = 'Playback failed';
+                                statusIndicator.style.color = '#ef4444';
+                                
+                                showError(
+                                    'Audio playback failed',
+                                    'Unable to play this audio. This may be due to browser restrictions or network issues.',
+                                    'warning'
+                                );
+                            });
+                    } else {
+                        replayAudio.pause();
                     }
-                    
-                    replayAudio.play()
-                        .then(() => {
-                            console.log('Replay audio started successfully');
-                        })
-                        .catch(e => {
-                            console.error('Replay audio failed:', e);
-                            replayButton.textContent = '❌ Play Failed';
-                            replayButton.style.background = '#ef4444';
-                            statusIndicator.textContent = 'Playback failed';
-                            statusIndicator.style.color = '#ef4444';
-                        });
-                } else {
-                    replayAudio.pause();
+                } catch (error) {
+                    console.error('Replay button error:', error);
+                    showError(
+                        'Audio control error',
+                        'There was an issue with the audio controls.',
+                        'warning'
+                    );
                 }
             };
             
@@ -1054,7 +1377,63 @@
             window.latestReplayButton = replayButton;
             window.latestAudioContainer = audioContainer;
             
-            console.log('Permanent replay button added successfully');
+            console.log('Enhanced permanent replay button added successfully');
+        }
+        
+        // Enhanced error testing function
+        async function testErrorHandling() {
+            console.log('Testing error handling scenarios');
+            hideError();
+            
+            const errorTypes = ['stt', 'llm', 'tts', 'all'];
+            const selectedError = errorTypes[Math.floor(Math.random() * errorTypes.length)];
+            
+            showError(
+                'Testing error scenarios',
+                `Simulating ${selectedError} service failure to test error handling...`,
+                'info'
+            );
+            
+            try {
+                const response = await fetch(`/agent/chat/${currentSessionId}/test-errors?error_type=${selectedError}`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Test request failed: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log('Error test result:', result);
+                
+                if (processApiResponse(result, 'error testing')) {
+                    // Add the test response to conversation
+                    if (result.transcribed_text && result.llm_response) {
+                        conversationHistory.push({
+                            role: 'user',
+                            content: result.transcribed_text
+                        });
+                        conversationHistory.push({
+                            role: 'assistant',
+                            content: result.llm_response
+                        });
+                        
+                        messageCount += 2;
+                        displayConversation();
+                        saveConversation();
+                        updateMessageLimit();
+                        
+                        // Add replay button for test audio
+                        if (result.audio_url) {
+                            addPermanentReplayButton(result.audio_url, true);
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error testing failed:', error);
+                handleApiError(error, 'error testing');
+            }
         }
         
         function flashReplayButton() {
