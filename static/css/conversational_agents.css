@@ -1,0 +1,477 @@
+/* Day 12: Enhanced Conversational Agent Styles */
+/* Single record button with animations and modern design */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+}
+
+.header {
+    margin-bottom: 40px;
+}
+
+.header h1 {
+    color: #333;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header p {
+    color: #666;
+    font-size: 1.1rem;
+    margin-bottom: 5px;
+}
+
+.day-badge {
+    display: inline-block;
+    background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+/* Enhanced Record Button */
+.record-section {
+    margin: 40px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#recordBtn {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    border-radius: 50px;
+    padding: 20px 40px;
+    color: white;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+#recordBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
+}
+
+#recordBtn:active {
+    transform: translateY(0);
+}
+
+#recordBtn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Record button states */
+#recordBtn.idle {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+#recordBtn.recording {
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+#recordBtn.processing {
+    background: linear-gradient(135deg, #4ECDC4, #44A08D);
+}
+
+#recordBtn.playing {
+    background: linear-gradient(135deg, #A8E6CF, #7FCDCD);
+}
+
+#recordBtn.error {
+    background: linear-gradient(135deg, #FF6B6B, #C44569);
+}
+
+/* Record button animations */
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.record-icon.recording-pulse {
+    animation: pulse-icon 1s ease-in-out infinite;
+}
+
+.record-icon.processing-spin {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes pulse-icon {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Status display */
+.status-section {
+    margin: 30px 0;
+}
+
+#conversationStatus {
+    background: rgba(102, 126, 234, 0.1);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 15px;
+    padding: 15px;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    color: #333;
+}
+
+#conversationStatus.ready {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: rgba(76, 175, 80, 0.3);
+    color: #2e7d32;
+}
+
+#conversationStatus.recording {
+    background: rgba(255, 107, 107, 0.1);
+    border-color: rgba(255, 107, 107, 0.3);
+    color: #d32f2f;
+    animation: pulse-status 1.5s ease-in-out infinite;
+}
+
+#conversationStatus.processing {
+    background: rgba(78, 205, 196, 0.1);
+    border-color: rgba(78, 205, 196, 0.3);
+    color: #00695c;
+}
+
+#conversationStatus.playing {
+    background: rgba(168, 230, 207, 0.1);
+    border-color: rgba(168, 230, 207, 0.3);
+    color: #2e7d32;
+}
+
+#conversationStatus.error {
+    background: rgba(244, 67, 54, 0.1);
+    border-color: rgba(244, 67, 54, 0.3);
+    color: #c62828;
+}
+
+#conversationStatus.status-update {
+    animation: bounce-in 0.3s ease-out;
+}
+
+@keyframes pulse-status {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes bounce-in {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    50% { transform: scale(1.02); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Conversation History */
+.conversation-section {
+    margin: 30px 0;
+}
+
+#conversationHistory {
+    display: none;
+    text-align: left;
+    margin-top: 30px;
+}
+
+.conversation-history h3 {
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 1.3rem;
+}
+
+.user-message, .ai-response {
+    margin: 15px 0;
+    padding: 15px;
+    border-radius: 15px;
+    animation: fade-in 0.5s ease-out;
+}
+
+.user-message {
+    background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+    border-left: 4px solid #2196F3;
+}
+
+.ai-response {
+    background: linear-gradient(135deg, #F3E5F5, #E1BEE7);
+    border-left: 4px solid #9C27B0;
+}
+
+.user-message strong, .ai-response strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.user-message p, .ai-response p {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #333;
+}
+
+.error-note {
+    display: block;
+    margin-top: 8px;
+    font-style: italic;
+    color: #ff9800;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Conversation Stats */
+.conversation-stats {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 12px;
+}
+
+.conversation-stats span {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: #333;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+/* Controls Section */
+.controls-section {
+    margin: 30px 0;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.control-btn {
+    background: rgba(255, 255, 255, 0.8);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 25px;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #333;
+    transition: all 0.3s ease;
+}
+
+.control-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.5);
+    transform: translateY(-1px);
+}
+
+/* Keyboard shortcuts hint */
+.shortcuts-hint {
+    margin-top: 30px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    font-size: 0.85rem;
+    color: #666;
+    line-height: 1.4;
+}
+
+.shortcuts-hint strong {
+    color: #333;
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    z-index: 1000;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        padding: 20px;
+        border-radius: 15px;
+    }
+    
+    .header h1 {
+        font-size: 2rem;
+    }
+    
+    #recordBtn {
+        padding: 15px 30px;
+        font-size: 1rem;
+        min-width: 180px;
+    }
+    
+    .conversation-stats {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .controls-section {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .control-btn {
+        padding: 12px 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .header p {
+        font-size: 1rem;
+    }
+    
+    #recordBtn {
+        padding: 12px 25px;
+        font-size: 0.9rem;
+        min-width: 160px;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .record-text {
+        font-size: 0.8rem;
+    }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .container {
+        background: white;
+        border: 2px solid black;
+    }
+    
+    #recordBtn {
+        border: 2px solid black;
+    }
+    
+    #conversationStatus {
+        border-width: 2px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    body {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    }
+    
+    .container {
+        background: rgba(30, 30, 30, 0.95);
+        color: #e0e0e0;
+    }
+    
+    .header h1 {
+        color: #e0e0e0;
+    }
+    
+    .header p {
+        color: #b0b0b0;
+    }
+    
+    #conversationStatus {
+        color: #e0e0e0;
+    }
+    
+    .user-message p, .ai-response p {
+        color: #333;
+    }
+    
+    .conversation-stats span {
+        color: #e0e0e0;
+        background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .shortcuts-hint {
+        background: rgba(255, 255, 255, 0.1);
+        color: #b0b0b0;
+    }
+}
