@@ -1,22 +1,16 @@
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from pydantic import BaseModel
+
 import os
 from dotenv import load_dotenv
 import uvicorn
-import aiofiles
-from pathlib import Path
-import uuid
 import logging
 import time
-import requests
-import io
+import traceback
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-import traceback
-import asyncio
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 # Load environment variables
 load_dotenv()
@@ -28,12 +22,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Error handling constants
-MAX_RETRIES = 3
-RETRY_DELAY = 1.0  # seconds
-FALLBACK_AUDIO_URL = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuW2e/LdCUELIHQ8tiJOQcZZ7zl559NEApPqOPxtmMcBQeA5"
+from services.utils import STTError, LLMError, TTSError, retry_with_backoff, FALLBACK_AUDIO_URL
+from services.stt_service import transcribe_audio_with_fallback, generate_demo_transcription
+from services.llm_service import generate_llm_response_with_fallback, generate_fallback_llm_response
+from services.tts_service import generate_tts_with_fallback
+from services.schemas import ChatResponse, HistoryResponse, ClearHistoryResponse
 
-# Error messages for different failure scenarios
+
 ERROR_MESSAGES = {
     "stt_failed": "I'm having trouble understanding your audio right now. Could you please try speaking again?",
     "llm_failed": "I'm experiencing some difficulty processing your request at the moment. Please try again in a few seconds.",
@@ -47,75 +42,13 @@ ERROR_MESSAGES = {
 
 app = FastAPI(title="30 Days Voice Agents - Day 12: Enhanced UI")
 
-# Error handling helper functions
-class VoiceAgentError(Exception):
-    """Base exception for voice agent errors"""
-    def __init__(self, message: str, error_type: str = "general_error", original_error: Exception = None):
-        self.message = message
-        self.error_type = error_type
-        self.original_error = original_error
-        super().__init__(self.message)
-
-class STTError(VoiceAgentError):
-    """Speech-to-Text specific error"""
-    def __init__(self, message: str, original_error: Exception = None):
-        super().__init__(message, "stt_failed", original_error)
-
-class LLMError(VoiceAgentError):
-    """Large Language Model specific error"""
-    def __init__(self, message: str, original_error: Exception = None):
-        super().__init__(message, "llm_failed", original_error)
-
-class TTSError(VoiceAgentError):
-    """Text-to-Speech specific error"""
-    def __init__(self, message: str, original_error: Exception = None):
-        super().__init__(message, "tts_failed", original_error)
-
 async def retry_with_backoff(func, *args, **kwargs):
     """Retry function with exponential backoff"""
     for attempt in range(MAX_RETRIES):
         try:
             if asyncio.iscoroutinefunction(func):
                 return await func(*args, **kwargs)
-            else:
-                return func(*args, **kwargs)
-        except Exception as e:
-            if attempt == MAX_RETRIES - 1:
-                raise e
-            
-            wait_time = RETRY_DELAY * (2 ** attempt)
-            logger.warning(f"Attempt {attempt + 1} failed: {str(e)}. Retrying in {wait_time}s...")
-            await asyncio.sleep(wait_time)
 
-def handle_api_error(error: Exception, service_name: str) -> dict:
-    """Handle API errors and return appropriate fallback response"""
-    error_details = {
-        "service": service_name,
-        "error_type": type(error).__name__,
-        "error_message": str(error),
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    logger.error(f"{service_name} error: {error_details}")
-    
-    # Determine error type and appropriate message
-    if "api" in str(error).lower() and "key" in str(error).lower():
-        error_type = "api_key_missing"
-    elif "timeout" in str(error).lower() or "time" in str(error).lower():
-        error_type = "timeout_error"
-    elif "network" in str(error).lower() or "connection" in str(error).lower():
-        error_type = "network_error"
-    elif "rate" in str(error).lower() and "limit" in str(error).lower():
-        error_type = "rate_limit"
-    else:
-        error_type = "general_error"
-    
-    return {
-        "success": False,
-        "error_type": error_type,
-        "fallback_message": ERROR_MESSAGES.get(error_type, ERROR_MESSAGES["general_error"]),
-        "error_details": error_details,
-        "has_fallback": True
     }
 
 def create_fallback_response(transcribed_text: str = "", error_context: str = "", session_id: str = "") -> dict:
@@ -345,143 +278,9 @@ async def poll_transcription_completion(transcript_id: str, headers: dict, max_a
     
     raise STTError("Transcription timed out after maximum attempts")
 
-# Enhanced LLM function with error handling
-async def generate_llm_response_with_fallback(prompt: str, session_id: str = "") -> str:
-    """Generate LLM response with robust error handling and fallback mechanisms"""
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
-    
-    if not gemini_api_key or gemini_api_key == "your_gemini_api_key_here":
-        logger.warning("Gemini API key not configured, using intelligent fallback")
-        return generate_fallback_llm_response(prompt, session_id)
-    
-    try:
-        return await retry_with_backoff(perform_gemini_generation, prompt, gemini_api_key)
-    except Exception as e:
-        logger.error(f"LLM generation failed after retries: {str(e)}")
-        return generate_fallback_llm_response(prompt, session_id, error_context=str(e))
 
-def generate_fallback_llm_response(prompt: str, session_id: str = "", error_context: str = "") -> str:
-    """Generate intelligent fallback response when LLM fails"""
-    history_length = len(get_chat_history(session_id)) if session_id else 0
-    
-    # Analyze the prompt for context
-    prompt_lower = prompt.lower()
-    
-    if any(word in prompt_lower for word in ["hello", "hi", "hey", "start"]):
-        response = "Hello! I'm happy to chat with you today. What would you like to talk about?"
-    elif any(word in prompt_lower for word in ["how", "what", "why", "when", "where"]):
-        response = "That's a great question! I'd love to help you with that. Could you tell me a bit more about what you're looking for?"
-    elif any(word in prompt_lower for word in ["weather", "temperature", "rain", "sunny"]):
-        response = "I'd recommend checking a current weather app or website for the most accurate weather information in your area."
-    elif any(word in prompt_lower for word in ["thank", "thanks", "appreciate"]):
-        response = "You're very welcome! I'm here to help whenever you need assistance."
-    elif history_length > 3:
-        response = "I appreciate our conversation so far! Is there anything specific you'd like to explore further?"
-    else:
-        response = "I understand you're trying to communicate with me. Could you please rephrase your question or try again?"
-    
-    if error_context:
-        response += " (Note: I'm currently experiencing some technical difficulties, but I'm still here to help!)"
-    
-    return response
 
-async def perform_gemini_generation(prompt: str, api_key: str) -> str:
-    """Perform Gemini LLM generation with enhanced error handling"""
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # Add safety and length constraints
-        enhanced_prompt = f"""Please provide a helpful, safe, and concise response (under 2000 characters for voice synthesis) to this query: {prompt}"""
-        
-        response = model.generate_content(enhanced_prompt)
-        
-        if not response.text:
-            raise LLMError("LLM returned empty response")
-        
-        # Ensure response length is appropriate for TTS
-        llm_text = response.text
-        if len(llm_text) > 2200:
-            llm_text = llm_text[:2100] + "... Would you like me to continue?"
-        
-        return llm_text
-        
-    except ImportError:
-        raise LLMError("Google Generative AI library not installed")
-    except Exception as e:
-        if "quota" in str(e).lower() or "limit" in str(e).lower():
-            raise LLMError("API quota exceeded - please try again later")
-        elif "key" in str(e).lower():
-            raise LLMError("API key authentication failed")
-        else:
-            raise LLMError(f"LLM generation failed: {str(e)}")
 
-# Enhanced TTS function with error handling
-async def generate_tts_with_fallback(text: str) -> tuple[str, str]:
-    """Generate TTS audio with robust error handling and fallback mechanisms"""
-    murf_api_key = os.getenv("MURF_API_KEY")
-    
-    if not murf_api_key or murf_api_key == "your_murf_api_key_here":
-        logger.warning("Murf API key not configured, using fallback audio")
-        return FALLBACK_AUDIO_URL, "Fallback audio (Murf API key required)"
-    
-    try:
-        return await retry_with_backoff(perform_murf_generation, text, murf_api_key)
-    except Exception as e:
-        logger.error(f"TTS generation failed after retries: {str(e)}")
-        return FALLBACK_AUDIO_URL, f"Fallback audio (TTS error: {str(e)[:50]}...)"
-
-async def perform_murf_generation(text: str, api_key: str) -> tuple[str, str]:
-    """Perform Murf TTS generation with enhanced error handling"""
-    try:
-        headers = {
-            "api-key": api_key,
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "voiceId": "en-US-ken",
-            "style": "Conversational",
-            "text": text,
-            "rate": 0,
-            "pitch": 0,
-            "sampleRate": 48000,
-            "format": "MP3",
-            "channelType": "STEREO",
-            "pronunciationDictionary": {},
-            "encodeAsBase64": False,
-            "variation": 1,
-            "audioDuration": 0,
-            "modelVersion": "GEN2"
-        }
-        
-        response = requests.post(
-            "https://api.murf.ai/v1/speech/generate",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
-        
-        if response.status_code != 200:
-            raise TTSError(f"Murf API request failed: {response.status_code} - {response.text}")
-        
-        result = response.json()
-        audio_url = result.get("audioFile")
-        
-        if not audio_url:
-            error_msg = result.get("error", "No audio file URL returned")
-            raise TTSError(f"Murf AI speech generation failed: {error_msg}")
-        
-        return audio_url, "en-US-ken (Murf AI)"
-        
-    except requests.exceptions.Timeout:
-        raise TTSError("TTS request timed out")
-    except requests.exceptions.ConnectionError:
-        raise TTSError("Network connection failed during TTS generation")
-    except Exception as e:
-        raise TTSError(f"TTS generation failed: {str(e)}")
 
 # In-memory chat history storage (for prototype)
 # Format: {session_id: [{"role": "user"|"assistant", "content": str, "timestamp": datetime}, ...]}
@@ -549,7 +348,7 @@ async def chat_interface_redirect():
 async def health_check():
     return {"status": "healthy", "day": 12, "ui_version": "enhanced"}
 
-@app.post("/agent/chat/{session_id}")
+@app.post("/agent/chat/{session_id}", response_model=ChatResponse)
 async def conversational_agent_chat(session_id: str, audio_file: UploadFile = File(...)):
     """
     Day 12: Enhanced Conversational Agent with Revamped UI
@@ -759,7 +558,7 @@ Please respond in a natural, conversational way. Remember the context of our pre
         return fallback_response
 
 # Helper endpoint to get chat history
-@app.get("/agent/chat/{session_id}/history")
+@app.get("/agent/chat/{session_id}/history", response_model=HistoryResponse)
 async def get_session_history(session_id: str):
     """Get chat history for a session"""
     history = get_chat_history(session_id)
@@ -771,7 +570,7 @@ async def get_session_history(session_id: str):
     }
 
 # Helper endpoint to clear chat history
-@app.delete("/agent/chat/{session_id}/history")
+@app.delete("/agent/chat/{session_id}/history", response_model=ClearHistoryResponse)
 async def clear_session_history(session_id: str):
     """Clear chat history for a session"""
     clear_chat_history(session_id)
